@@ -36,14 +36,20 @@ A Django-based web application that monitors Vinted listings for underpriced ite
   - Absolute price: Items below user-defined price threshold
   - Both methods can be used simultaneously
 
-### 4. Continuous Monitoring
+### 4. Visual Enhancement Features
+- **Color Grading**: Items color-coded by upload age (green=newest, yellow=medium, red=oldest)
+- **Highlight Words**: Thick double borders with black outline for items containing specified keywords
+- **Blacklist Filtering**: Exclude items with unwanted words from calculations and display
+- **Upload Date Tracking**: Extract timestamps from Vinted photo metadata for accurate age-based coloring
+
+### 5. Continuous Monitoring
 - Background tasks continuously poll Vinted API
 - Index all items found in searches
 - Store complete API response data for all items
 - Detect newly listed underpriced items
 - Immediate email notifications when deals are found
 
-### 5. Authentication & API Management
+### 6. Authentication & API Management
 - Use Playwright to obtain `access_token_web` cookie from Vinted homepage
 - Manage cookie refresh automatically
 - Handle rate limiting and API errors gracefully
@@ -58,9 +64,12 @@ class PriceWatch(models.Model):
     search_parameters = models.JSONField()  # All Vinted API parameters
     std_dev_threshold = models.FloatField(default=1.5)
     absolute_price_threshold = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    blacklist_words = models.TextField(blank=True, help_text="Comma-separated words to exclude items")
+    highlight_words = models.TextField(blank=True, help_text="Comma-separated words to highlight items with thick borders")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    items = models.ManyToManyField('VintedItem', blank=True, related_name='watches')
     
     def __str__(self):
         return f"{self.user.username} - {self.name}"
@@ -79,6 +88,7 @@ class VintedItem(models.Model):
     size = models.CharField(max_length=100, null=True, blank=True)
     color = models.CharField(max_length=100, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
+    upload_date = models.DateTimeField(null=True, blank=True, help_text="When the item was uploaded to Vinted")
     
     # Complete API response for additional data
     api_response = models.JSONField()
