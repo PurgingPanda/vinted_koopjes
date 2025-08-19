@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Vinted Price Watch{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Welcome Header -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-6">
+            <h1 class="text-2xl font-bold text-gray-900">Welcome back, {{ user.username }}!</h1>
+            <p class="mt-1 text-sm text-gray-600">Monitor your price watches and discover great deals.</p>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-secondary rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Watches</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.total_watches }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-accent rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Active Watches</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.active_watches }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Alerts</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.total_alerts }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Pending Emails</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.unsent_alerts }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <!-- Recent Watches -->
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-medium text-gray-900">Recent Watches</h2>
+                    <a href="{% url 'watch_list' %}" class="text-sm font-medium text-secondary hover:text-blue-500">View all</a>
+                </div>
+                <div class="mt-6 space-y-4">
+                    {% for watch in watches %}
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <a href="{% url 'watch_detail' watch.pk %}" class="font-medium text-gray-900 hover:text-secondary">
+                                {{ watch.name }}
+                            </a>
+                            <p class="text-sm text-gray-500">
+                                {% if watch.is_active %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>
+                                {% endif %}
+                                {{ watch.alert_count }} alerts
+                            </p>
+                        </div>
+                        <div class="text-sm text-gray-500">
+                            {{ watch.created_at|date:"M d" }}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-6">
+                        <p class="text-gray-500 text-sm">No watches yet. 
+                            <a href="{% url 'watch_create' %}" class="text-secondary hover:text-blue-500">Create your first watch</a>
+                        </p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Alerts -->
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-6">
+                <h2 class="text-lg font-medium text-gray-900">Recent Alerts</h2>
+                <div class="mt-6 space-y-4">
+                    {% for alert in recent_alerts %}
+                    <div class="border-l-4 border-yellow-400 bg-yellow-50 p-4">
+                        <div class="flex">
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-yellow-800">
+                                    {{ alert.price_watch.name }}
+                                </p>
+                                <p class="text-xs text-yellow-700 mt-1">
+                                    Item €{{ alert.item.price }} - {{ alert.std_deviations_below|floatformat:1 }}σ below average
+                                </p>
+                                <p class="text-xs text-yellow-600">
+                                    {{ alert.detected_at|timesince }} ago
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-6">
+                        <p class="text-gray-500 text-sm">No alerts yet. Your watches will notify you when great deals are found!</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <a href="{% url 'watch_create' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-secondary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Create New Watch
+                </a>
+                <a href="{% url 'watch_list' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                    </svg>
+                    View All Watches
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

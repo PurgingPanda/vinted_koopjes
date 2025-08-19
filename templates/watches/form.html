@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if object %}Edit Watch{% else %}Create Watch{% endif %} - Vinted Price Watch{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">
+                {% if object %}Edit Price Watch{% else %}Create New Price Watch{% endif %}
+            </h2>
+        </div>
+        
+        <form method="post" class="p-6 space-y-6">
+            {% csrf_token %}
+            
+            {% if form.errors %}
+                <div class="bg-red-50 border border-red-200 rounded-md p-4">
+                    <div class="text-red-700">
+                        {% for field, errors in form.errors.items %}
+                            {% for error in errors %}
+                                <p class="text-sm">{{ field }}: {{ error }}</p>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Quick Fill from URL -->
+            <div class="space-y-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 class="text-lg font-medium text-gray-900">Quick Fill from Vinted URL</h3>
+                <div>
+                    <label for="{{ form.vinted_url.id_for_label }}" class="block text-sm font-medium text-gray-700">Vinted Catalog URL</label>
+                    {{ form.vinted_url }}
+                    {% if form.vinted_url.help_text %}
+                        <p class="mt-1 text-sm text-gray-500">{{ form.vinted_url.help_text }}</p>
+                    {% endif %}
+                    <button type="button" id="parse-url-btn" class="mt-2 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        Parse URL & Fill Form
+                    </button>
+                </div>
+                <div id="url-preview" class="hidden">
+                    <div class="bg-white border border-blue-300 rounded p-3">
+                        <h4 class="text-sm font-medium text-gray-900 mb-2">Parsed Parameters:</h4>
+                        <p id="preview-text" class="text-sm text-gray-700"></p>
+                    </div>
+                </div>
+                <div id="url-error" class="hidden">
+                    <div class="bg-red-50 border border-red-200 rounded p-3">
+                        <p class="text-sm text-red-700" id="error-text"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Basic Information -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-medium text-gray-900">Basic Information</h3>
+                
+                <div>
+                    <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-gray-700">Watch Name</label>
+                    {{ form.name }}
+                    {% if form.name.help_text %}
+                        <p class="mt-1 text-sm text-gray-500">{{ form.name.help_text }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Search Parameters -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-medium text-gray-900">Search Parameters</h3>
+                
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="{{ form.search_text.id_for_label }}" class="block text-sm font-medium text-gray-700">Search Text</label>
+                        {{ form.search_text }}
+                        {% if form.search_text.help_text %}
+                            <p class="mt-1 text-sm text-gray-500">{{ form.search_text.help_text }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label for="{{ form.price_to.id_for_label }}" class="block text-sm font-medium text-gray-700">Max Price (€)</label>
+                        {{ form.price_to }}
+                        {% if form.price_to.help_text %}
+                            <p class="mt-1 text-sm text-gray-500">{{ form.price_to.help_text }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="{{ form.catalog_ids.id_for_label }}" class="block text-sm font-medium text-gray-700">Category IDs</label>
+                        {{ form.catalog_ids }}
+                        {% if form.catalog_ids.help_text %}
+                            <p class="mt-1 text-sm text-gray-500">{{ form.catalog_ids.help_text }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label for="{{ form.brand_ids.id_for_label }}" class="block text-sm font-medium text-gray-700">Brand IDs</label>
+                        {{ form.brand_ids }}
+                        {% if form.brand_ids.help_text %}
+                            <p class="mt-1 text-sm text-gray-500">{{ form.brand_ids.help_text }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                        <label for="{{ form.status_ids.id_for_label }}" class="block text-sm font-medium text-gray-700">Condition IDs</label>
+                        {{ form.status_ids }}
+                        {% if form.status_ids.help_text %}
+                            <p class="mt-1 text-sm text-gray-500">{{ form.status_ids.help_text }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label for="{{ form.size_ids.id_for_label }}" class="block text-sm font-medium text-gray-700">Size IDs</label>
+                        {{ form.size_ids }}
+                        {% if form.size_ids.help_text %}
+                            <p class="mt-1 text-sm text-gray-500">{{ form.size_ids.help_text }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label for="{{ form.color_ids.id_for_label }}" class="block text-sm font-medium text-gray-700">Color IDs</label>
+                        {{ form.color_ids }}
+                        {% if form.color_ids.help_text %}
+                            <p class="mt-1 text-sm text-gray-500">{{ form.color_ids.help_text }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alert Settings -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-medium text-gray-900">Alert Settings</h3>
+                
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="{{ form.std_dev_threshold.id_for_label }}" class="block text-sm font-medium text-gray-700">Standard Deviations Below Average</label>
+                        {{ form.std_dev_threshold }}
+                        {% if form.std_dev_threshold.help_text %}
+                            <p class="mt-1 text-sm text-gray-500">{{ form.std_dev_threshold.help_text }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-sm text-gray-500">Items priced this many standard deviations below the average will trigger alerts</p>
+                    </div>
+                    
+                    <div>
+                        <label for="{{ form.absolute_price_threshold.id_for_label }}" class="block text-sm font-medium text-gray-700">Absolute Price Threshold (€)</label>
+                        {{ form.absolute_price_threshold }}
+                        {% if form.absolute_price_threshold.help_text %}
+                            <p class="mt-1 text-sm text-gray-500">{{ form.absolute_price_threshold.help_text }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-sm text-gray-500">Optional: Alert for items below this absolute price</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="{{ form.blacklist_words.id_for_label }}" class="block text-sm font-medium text-gray-700">Blacklist Words</label>
+                    {{ form.blacklist_words }}
+                    {% if form.blacklist_words.help_text %}
+                        <p class="mt-1 text-sm text-gray-500">{{ form.blacklist_words.help_text }}</p>
+                    {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.highlight_words.id_for_label }}" class="block text-sm font-medium text-purple-700">Highlight Words</label>
+                    {{ form.highlight_words }}
+                    {% if form.highlight_words.help_text %}
+                        <p class="mt-1 text-sm text-purple-600">{{ form.highlight_words.help_text }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="pt-6 border-t border-gray-200">
+                <div class="flex items-center justify-between">
+                    <a href="{% url 'watch_list' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary">
+                        Cancel
+                    </a>
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-secondary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary">
+                        {% if object %}Update Watch{% else %}Create Watch{% endif %}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const parseBtn = document.getElementById('parse-url-btn');
+    const urlInput = document.getElementById('vinted-url-input');
+    const urlPreview = document.getElementById('url-preview');
+    const urlError = document.getElementById('url-error');
+    const previewText = document.getElementById('preview-text');
+    const errorText = document.getElementById('error-text');
+    
+    function hideMessages() {
+        urlPreview.classList.add('hidden');
+        urlError.classList.add('hidden');
+    }
+    
+    function showPreview(preview) {
+        hideMessages();
+        previewText.textContent = preview;
+        urlPreview.classList.remove('hidden');
+    }
+    
+    function showError(error) {
+        hideMessages();
+        errorText.textContent = error;
+        urlError.classList.remove('hidden');
+    }
+    
+    function fillFormFields(data) {
+        // Fill form fields with parsed data
+        if (data.search_text) {
+            const searchField = document.getElementById('id_search_text');
+            if (searchField) searchField.value = data.search_text;
+        }
+        
+        if (data.price_to) {
+            const priceField = document.getElementById('id_price_to');
+            if (priceField) priceField.value = data.price_to;
+        }
+        
+        if (data.catalog_ids) {
+            const catalogField = document.getElementById('id_catalog_ids');
+            if (catalogField) catalogField.value = data.catalog_ids;
+        }
+        
+        if (data.brand_ids) {
+            const brandField = document.getElementById('id_brand_ids');
+            if (brandField) brandField.value = data.brand_ids;
+        }
+        
+        if (data.status_ids) {
+            const statusField = document.getElementById('id_status_ids');
+            if (statusField) statusField.value = data.status_ids;
+        }
+        
+        if (data.size_ids) {
+            const sizeField = document.getElementById('id_size_ids');
+            if (sizeField) sizeField.value = data.size_ids;
+        }
+        
+        if (data.color_ids) {
+            const colorField = document.getElementById('id_color_ids');
+            if (colorField) colorField.value = data.color_ids;
+        }
+        
+        // Auto-generate watch name if not set
+        const nameField = document.getElementById('id_name');
+        if (nameField && !nameField.value && data.search_text) {
+            nameField.value = `${data.search_text} watch`;
+        }
+    }
+    
+    parseBtn.addEventListener('click', async function() {
+        const url = urlInput.value.trim();
+        
+        if (!url) {
+            showError('Please enter a Vinted URL');
+            return;
+        }
+        
+        // Disable button and show loading
+        parseBtn.disabled = true;
+        parseBtn.textContent = 'Parsing...';
+        hideMessages();
+        
+        try {
+            const response = await fetch('{% url "parse_vinted_url" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: 'url=' + encodeURIComponent(url)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                fillFormFields(result.data);
+                showPreview(result.preview);
+            } else {
+                showError(result.error || 'Failed to parse URL');
+            }
+        } catch (error) {
+            showError('Network error: ' + error.message);
+        } finally {
+            // Re-enable button
+            parseBtn.disabled = false;
+            parseBtn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>Parse URL & Fill Form';
+        }
+    });
+    
+    // Also allow parsing on Enter key
+    urlInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            parseBtn.click();
+        }
+    });
+});
+</script>
+{% endblock %}
