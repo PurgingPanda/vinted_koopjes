@@ -7,6 +7,7 @@ from datetime import timedelta
 from .models import PriceWatch, VintedItem
 from .utils import fetch_and_process_items
 from .services import vinted_api
+from .activity_logger import ActivityLogger
 
 logger = logging.getLogger(__name__)
 
@@ -16,23 +17,29 @@ def monitor_price_watches():
     """
     Main background task that monitors all active price watches
     """
-    logger.info("Starting price watch monitoring cycle")
-    
-    try:
+    with ActivityLogger('monitor') as activity_log:
+        print("🔄 BACKGROUND TASK: Starting price watch monitoring cycle")
+        logger.info("Starting price watch monitoring cycle")
+        
         # Get all active price watches
         active_watches = PriceWatch.objects.filter(is_active=True)
         
+        print(f"📊 Found {active_watches.count()} active price watches")
         logger.info(f"Found {active_watches.count()} active price watches")
         
+        total_processed = 0
         for watch in active_watches:
+            print(f"   • Scheduling check for: {watch.name}")
             # Schedule individual watch processing
             check_price_watch.now(watch.id)
+            total_processed += 1
         
         # Clean up old inactive items
         cleanup_old_items.now()
+        print("✅ Price watch monitoring cycle completed")
         
-    except Exception as e:
-        logger.error(f"Error in monitor_price_watches: {e}")
+        # Update activity stats
+        activity_log.update_stats(items_processed=total_processed)
 
 
 @background
@@ -40,19 +47,30 @@ def check_price_watch(watch_id: int):
     """
     Process a specific price watch
     """
+    watch = None
     try:
         watch = PriceWatch.objects.get(id=watch_id, is_active=True)
-        logger.info(f"Processing price watch: {watch.name}")
         
-        # Fetch and process items
-        processed_count = fetch_and_process_items(watch)
-        
-        logger.info(f"Completed processing watch {watch.name}: {processed_count} items processed")
-        
+        with ActivityLogger('check_watch', watch) as activity_log:
+            print(f"🔍 Processing price watch: {watch.name}")
+            logger.info(f"Processing price watch: {watch.name}")
+            
+            # Fetch and process items
+            processed_count = fetch_and_process_items(watch)
+            
+            print(f"📈 Completed processing watch {watch.name}: {processed_count} items processed")
+            logger.info(f"Completed processing watch {watch.name}: {processed_count} items processed")
+            
+            # Update activity stats
+            activity_log.update_stats(items_processed=processed_count)
+            
     except PriceWatch.DoesNotExist:
+        print(f"⚠️ Price watch {watch_id} not found or inactive")
         logger.warning(f"Price watch {watch_id} not found or inactive")
     except Exception as e:
+        print(f"❌ Error processing price watch {watch_id}: {e}")
         logger.error(f"Error processing price watch {watch_id}: {e}")
+        raise
 
 
 @background(schedule=3600)  # Run every hour
@@ -117,15 +135,16 @@ def start_monitoring():
     logger.info("Starting Vinted price monitoring system")
     
     # Test connection first
-    if not test_vinted_connection():
-        logger.error("Cannot start monitoring - Vinted API connection failed")
-        return False
+    test_vinted_connection.now()
     
-    # Start the main monitoring loop
-    monitor_price_watches()
+    # Start the main monitoring loop with proper repeat scheduling
+    monitor_price_watches(repeat=300)  # Every 5 minutes
     
     # Start token refresh cycle
-    refresh_vinted_token()
+    refresh_vinted_token(repeat=7200)  # Every 2 hours
+    
+    # Start cleanup cycle  
+    cleanup_old_items(repeat=3600)  # Every hour
     
     logger.info("Price monitoring system started successfully")
     return True

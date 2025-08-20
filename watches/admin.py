@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PriceWatch, VintedItem, PriceStatistics, UnderpriceAlert
+from .models import PriceWatch, VintedItem, PriceStatistics, UnderpriceAlert, ScrapeActivity
 
 
 @admin.register(PriceWatch)
@@ -74,3 +74,31 @@ class UnderpriceAlertAdmin(admin.ModelAdmin):
     list_filter = ['email_sent', 'detected_at']
     search_fields = ['price_watch__name', 'item__vinted_id']
     readonly_fields = ['detected_at', 'email_sent_at']
+
+
+@admin.register(ScrapeActivity)
+class ScrapeActivityAdmin(admin.ModelAdmin):
+    list_display = ['task_type', 'status', 'price_watch', 'items_processed', 'duration_seconds', 'started_at', 'completed_at']
+    list_filter = ['task_type', 'status', 'started_at']
+    search_fields = ['price_watch__name', 'error_message']
+    readonly_fields = ['started_at', 'completed_at', 'duration_seconds']
+    ordering = ['-started_at']
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('price_watch')
+    
+    fieldsets = (
+        ('Task Information', {
+            'fields': ('task_type', 'status', 'price_watch')
+        }),
+        ('Statistics', {
+            'fields': ('items_processed', 'pages_fetched', 'new_items_found', 'alerts_generated')
+        }),
+        ('Timing', {
+            'fields': ('started_at', 'completed_at', 'duration_seconds')
+        }),
+        ('Error Details', {
+            'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+    )

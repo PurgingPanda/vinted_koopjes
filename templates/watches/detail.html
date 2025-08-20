@@ -269,7 +269,11 @@
         <div class="p-6">
             <div id="underpriced-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {% for item_info in underpriced_items|slice:":50" %}
-                <div class="{% if item_info.is_highlighted %}border-8 border-double{% else %}border{% endif %} {{ item_info.border_color|default:'border-gray-200' }} {% if item_info.is_highlighted %}shadow-[0_0_0_4px_black]{% endif %} rounded-lg p-3 {{ item_info.bg_color|default:'bg-gray-50' }} hover:shadow-md transition-all duration-200 cursor-pointer relative">
+                <div class="{% if item_info.is_highlighted %}border-8 border-double{% else %}border{% endif %} {{ item_info.border_color|default:'border-gray-200' }} {% if item_info.is_highlighted %}shadow-[0_0_0_4px_black]{% endif %} rounded-lg p-3 {{ item_info.bg_color|default:'bg-gray-50' }} hover:shadow-md transition-all duration-200 cursor-pointer relative" data-item-id="{{ item_info.item.vinted_id }}">
+                    <!-- Hide button -->
+                    <button onclick="hideItem(event, {{ item_info.item.vinted_id }})" class="absolute top-1 right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold z-10 flex items-center justify-center" title="Hide this item">
+                        ×
+                    </button>
                     <a href="{{ item_info.url }}" target="_blank" class="block">
                         <div class="flex flex-col">
                             {% if item_info.photo_url %}
@@ -807,6 +811,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const shadowClass = item.is_highlighted ? 'shadow-[0_0_0_4px_black]' : '';
         const bgClass = item.bg_color || 'bg-gray-50';
         div.className = `${borderClass} ${shadowClass} rounded-lg p-3 ${bgClass} hover:shadow-md transition-all duration-200 cursor-pointer relative`;
+        div.setAttribute('data-item-id', item.vinted_id);
         
         const sizeText = item.size ? ` • ${item.size}` : '';
         const colorText = item.color ? ` • ${item.color}` : '';
@@ -814,6 +819,10 @@ document.addEventListener('DOMContentLoaded', function() {
             `<img src="${item.photo_url}" alt="${item.title}" class="w-full h-32 object-cover rounded-lg mb-2">` : '';
         
         div.innerHTML = `
+            <!-- Hide button -->
+            <button onclick="hideItem(event, ${item.vinted_id})" class="absolute top-1 right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold z-10 flex items-center justify-center" title="Hide this item">
+                ×
+            </button>
             <a href="${item.url}" target="_blank" class="block">
                 <div class="flex flex-col">
                     ${photoImg}
@@ -840,6 +849,45 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return div;
     }
+    
+    // Function to hide an item
+    window.hideItem = async function(event, itemId) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        if (!confirm('Hide this item? It will be removed from your underpriced items list.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`{% url "hide_underpriced_item" watch.pk 0 %}`.replace('0', itemId), {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Remove the item from the display
+                const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
+                if (itemElement) {
+                    itemElement.style.transition = 'opacity 0.3s ease-out';
+                    itemElement.style.opacity = '0';
+                    setTimeout(() => {
+                        itemElement.remove();
+                    }, 300);
+                }
+            } else {
+                alert('Error hiding item: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error hiding item:', error);
+            alert('Error hiding item. Please try again.');
+        }
+    };
 });
 </script>
 {% endblock %}

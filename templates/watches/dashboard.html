@@ -3,6 +3,7 @@
 {% block title %}Dashboard - Vinted Price Watch{% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="space-y-6">
     <!-- Welcome Header -->
     <div class="bg-white overflow-hidden shadow rounded-lg">
@@ -186,5 +187,266 @@
             </div>
         </div>
     </div>
+    
+    <!-- Most Underpriced Items from All Watches -->
+    {% if most_underpriced %}
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-900">Most Underpriced Items Across All Watches</h2>
+                <div class="flex items-center space-x-4">
+                    <!-- Items count dropdown -->
+                    <div class="flex items-center space-x-2">
+                        <label for="items-select" class="text-sm text-gray-600">Show:</label>
+                        <select id="items-select" onchange="changeItemsCount()" class="text-sm border border-gray-300 rounded px-2 py-1">
+                            <option value="25" {% if items_limit == 25 %}selected{% endif %}>25 items</option>
+                            <option value="50" {% if items_limit == 50 %}selected{% endif %}>50 items</option>
+                            <option value="100" {% if items_limit == 100 %}selected{% endif %}>100 items</option>
+                            <option value="500" {% if items_limit == 500 %}selected{% endif %}>500 items</option>
+                        </select>
+                    </div>
+                    <!-- Color Legend -->
+                    <div class="flex items-center space-x-3 text-xs">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 border-2 border-green-400 bg-green-50 rounded mr-1"></div>
+                            <span class="text-gray-600">Newest</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 border-2 border-yellow-400 bg-yellow-50 rounded mr-1"></div>
+                            <span class="text-gray-600">Medium</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 border-2 border-red-400 bg-red-50 rounded mr-1"></div>
+                            <span class="text-gray-600">Oldest</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {% for item_info in most_underpriced|slice:":20" %}
+                <div class="{% if item_info.is_highlighted %}border-8 border-double{% else %}border{% endif %} {{ item_info.border_color|default:'border-gray-200' }} {% if item_info.is_highlighted %}shadow-[0_0_0_4px_black]{% endif %} rounded-lg p-3 {{ item_info.bg_color|default:'bg-gray-50' }} hover:shadow-md transition-all duration-200 cursor-pointer relative" data-item-id="{{ item_info.item.vinted_id }}">
+                    <!-- Watch name badge -->
+                    <div class="absolute top-1 left-1 bg-blue-500 text-white text-xs px-2 py-1 rounded z-10">
+                        {{ item_info.watch.name|truncatechars:15 }}
+                    </div>
+                    <!-- Hide button -->
+                    <button onclick="hideItemFromHomepage(event, {{ item_info.watch.pk }}, {{ item_info.item.vinted_id }})" class="absolute top-1 right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold z-10 flex items-center justify-center" title="Hide this item">
+                        ×
+                    </button>
+                    <a href="{{ item_info.url }}" target="_blank" class="block">
+                        <div class="flex flex-col">
+                            {% if item_info.photo_url %}
+                            <img src="{{ item_info.photo_url }}" alt="{{ item_info.title }}" class="w-full h-32 object-cover rounded-lg mb-2">
+                            {% endif %}
+                            <div class="flex-1">
+                                <p class="text-xs font-medium text-gray-900 truncate hover:text-gray-800 mb-1">
+                                    {{ item_info.title }}
+                                </p>
+                                <p class="text-xs text-gray-600 mb-1">
+                                    {{ item_info.brand }}
+                                    {% if item_info.size %}
+                                        • {{ item_info.size }}
+                                    {% endif %}
+                                    {% if item_info.color %}
+                                        • {{ item_info.color }}
+                                    {% endif %}
+                                </p>
+                                <p class="text-xs text-gray-600 mb-1">{{ item_info.condition_name }}</p>
+                                {% if item_info.upload_date %}
+                                <p class="text-xs text-gray-500 mb-2">{{ item_info.upload_date|timesince }} ago</p>
+                                {% endif %}
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-bold text-green-700">€{{ item_info.item.price }}</span>
+                                    <div class="text-right">
+                                        <div class="text-xs text-green-700 font-medium">{{ item_info.z_score|floatformat:1 }}σ</div>
+                                        <div class="text-xs text-gray-500">-€{{ item_info.price_difference|floatformat:0 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Live Feed of Recently Indexed Items -->
+    {% if recent_items %}
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">Recently Indexed Items</h2>
+            <div class="space-y-3">
+                {% for item in recent_items %}
+                <div class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
+                    {% if item.api_response.photo.url %}
+                    <img src="{{ item.api_response.photo.url }}" alt="{{ item.title }}" class="w-12 h-12 object-cover rounded-lg">
+                    {% else %}
+                    <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    {% endif %}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <a href="{{ item.api_response.url|default:'#' }}" target="_blank" class="font-medium text-gray-900 hover:text-secondary truncate">
+                                {{ item.title|default:'Unknown Item' }}
+                            </a>
+                            <span class="text-sm font-semibold text-green-600">€{{ item.price }}</span>
+                        </div>
+                        <div class="flex items-center justify-between mt-1">
+                            <div class="text-sm text-gray-500">
+                                <span>{{ item.brand|default:'Unknown Brand' }}</span>
+                                {% if item.size %} • {{ item.size }}{% endif %}
+                                <span class="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">{{ item.get_condition_display }}</span>
+                            </div>
+                            <span class="text-xs text-gray-400">{{ item.first_seen|timesince }} ago</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Price Trends Chart -->
+    {% if trend_data %}
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">Price Trends (Last 30 Days)</h2>
+            <div class="h-64">
+                <canvas id="priceTrendChart"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+<script>
+// Function to hide an item from homepage
+async function hideItemFromHomepage(event, watchId, itemId) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    try {
+        const response = await fetch(`/watches/${watchId}/hide-item/${itemId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Remove the item from the display
+            const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
+            if (itemElement) {
+                itemElement.style.transition = 'opacity 0.3s ease-out';
+                itemElement.style.opacity = '0';
+                setTimeout(() => {
+                    itemElement.remove();
+                }, 300);
+            }
+        } else {
+            alert('Error hiding item: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error hiding item:', error);
+        alert('Error hiding item. Please try again.');
+    }
+}
+
+// Function to change the number of items displayed
+function changeItemsCount() {
+    const select = document.getElementById('items-select');
+    const itemsCount = select.value;
+    
+    // Get current URL and update the items parameter
+    const url = new URL(window.location.href);
+    url.searchParams.set('items', itemsCount);
+    
+    // Reload the page with the new parameter
+    window.location.href = url.toString();
+}
+
+// Initialize price trend chart
+document.addEventListener('DOMContentLoaded', function() {
+    {% if trend_data_json %}
+    const trendData = {{ trend_data_json|safe }};
+    const chartCanvas = document.getElementById('priceTrendChart');
+    
+    if (chartCanvas && Object.keys(trendData).length > 0) {
+        const ctx = chartCanvas.getContext('2d');
+        
+        // Prepare datasets for each watch/condition combination
+        const datasets = [];
+        const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+        let colorIndex = 0;
+        
+        for (const [watchName, conditions] of Object.entries(trendData)) {
+            for (const [condition, data] of Object.entries(conditions)) {
+                if (data.length > 0) {
+                    datasets.push({
+                        label: `${watchName} - Condition ${condition}`,
+                        data: data.map(point => ({
+                            x: point.date,
+                            y: point.avg_price
+                        })),
+                        borderColor: colors[colorIndex % colors.length],
+                        backgroundColor: colors[colorIndex % colors.length] + '20',
+                        fill: false,
+                        tension: 0.1
+                    });
+                    colorIndex++;
+                }
+            }
+        }
+        
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Average Price Trends'
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'day'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Price (€)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    {% endif %}
+});
+</script>
 {% endblock %}

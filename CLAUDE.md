@@ -42,17 +42,34 @@ A Django-based web application that monitors Vinted listings for underpriced ite
 - **Blacklist Filtering**: Exclude items with unwanted words from calculations and display
 - **Upload Date Tracking**: Extract timestamps from Vinted photo metadata for accurate age-based coloring
 
-### 5. Continuous Monitoring
-- Background tasks continuously poll Vinted API
-- Index all items found in searches
+### 5. Continuous Monitoring & Activity Tracking
+- Background tasks continuously poll Vinted API with enhanced pagination (5 pages automatic, 10 pages manual)
+- Index all items found in searches with comprehensive logging
 - Store complete API response data for all items
-- Detect newly listed underpriced items
+- Detect newly listed underpriced items with statistical analysis
 - Immediate email notifications when deals are found
+- **ScrapeActivity Model**: Complete tracking of background task execution with timing, success rates, and error logging
+- **Activity Logger**: Context manager for automatic task monitoring and statistics collection
+- **Real-time Console Output**: Emoji-rich console logging for background task visibility
 
 ### 6. Authentication & API Management
 - Use Playwright to obtain `access_token_web` cookie from Vinted homepage
 - Manage cookie refresh automatically
 - Handle rate limiting and API errors gracefully
+
+### 7. Advanced Dashboard Features (Latest)
+- **Dynamic Item Count Selection**: Dropdown to select 25, 50, 100, or 500 most underpriced items
+- **Live Feed**: Real-time display of recently indexed items with photos and metadata
+- **Price Trend Charts**: Interactive Chart.js visualizations showing price movements over time
+- **Enhanced Pagination**: Intelligent item distribution across multiple watches for accurate counts
+- **Hide Functionality**: One-click item hiding with smooth animations and persistent state
+- **Color Grading & Highlighting**: Consistent visual enhancement across all views
+
+### 8. Security & Configuration Enhancements
+- **Environment Variables**: Secure `.env` file for EMAIL_HOST_PASSWORD and sensitive settings
+- **Automatic Cleanup**: Django signals automatically remove orphaned items when watches are deleted
+- **Database Optimization**: Comprehensive indexing for improved query performance
+- **Error Handling**: Robust error handling with detailed logging and graceful degradation
 
 ## Data Models
 
@@ -127,9 +144,58 @@ class UnderpriceAlert(models.Model):
     std_deviations_below = models.FloatField()
     email_sent = models.BooleanField(default=False)
     email_sent_at = models.DateTimeField(null=True, blank=True)
+    hidden = models.BooleanField(default=False, help_text="Hide this alert from display")
     
     class Meta:
         unique_together = ['price_watch', 'item']
+```
+
+### ScrapeActivity (Latest)
+```python
+class ScrapeActivity(models.Model):
+    """Track background task execution and scraping activity"""
+    TASK_TYPES = [
+        ('monitor', 'Monitor Price Watches'),
+        ('check_watch', 'Check Individual Watch'),
+        ('cleanup', 'Cleanup Old Items'),
+        ('token_refresh', 'Token Refresh'),
+        ('manual_index', 'Manual Index All'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('started', 'Started'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    task_type = models.CharField(max_length=20, choices=TASK_TYPES)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='started')
+    price_watch = models.ForeignKey(PriceWatch, on_delete=models.CASCADE, null=True, blank=True)
+    items_processed = models.IntegerField(default=0)
+    pages_fetched = models.IntegerField(default=0)
+    new_items_found = models.IntegerField(default=0)
+    alerts_generated = models.IntegerField(default=0)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.FloatField(null=True, blank=True)
+```
+
+### PriceTrend
+```python
+class PriceTrend(models.Model):
+    """Track price trends over time for analytics"""
+    price_watch = models.ForeignKey(PriceWatch, on_delete=models.CASCADE, related_name='price_trends')
+    condition = models.IntegerField(help_text="Item condition (status_id)")
+    date = models.DateField(help_text="Date of the trend data")
+    avg_price = models.DecimalField(max_digits=10, decimal_places=2)
+    min_price = models.DecimalField(max_digits=10, decimal_places=2)
+    max_price = models.DecimalField(max_digits=10, decimal_places=2)
+    item_count = models.IntegerField(help_text="Number of items found for this condition")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['price_watch', 'condition', 'date']
 ```
 
 ## API Integration

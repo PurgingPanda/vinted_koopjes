@@ -13,5 +13,6 @@ urlpatterns = [
     path('watches/<int:pk>/clear-reindex/', views.clear_and_reindex_watch_items, name='watch_clear_reindex'),
     path('watches/<int:pk>/clear-alerts/', views.clear_alerts, name='clear_alerts'),
     path('watches/<int:pk>/load-more/', views.load_more_underpriced, name='load_more_underpriced'),
+    path('watches/<int:watch_id>/hide-item/<int:item_id>/', views.hide_underpriced_item, name='hide_underpriced_item'),
     path('api/parse-url/', views.parse_vinted_url, name='parse_vinted_url'),
 ]

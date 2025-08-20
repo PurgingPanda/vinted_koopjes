@@ -76,6 +76,12 @@ class VintedItem(models.Model):
         indexes = [
             models.Index(fields=['condition', 'price']),
             models.Index(fields=['vinted_id']),
+            models.Index(fields=['upload_date']),
+            models.Index(fields=['first_seen']),
+            models.Index(fields=['last_seen']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['condition', 'upload_date']),
+            models.Index(fields=['price', 'upload_date']),
         ]
         ordering = ['-first_seen']
 
@@ -105,12 +111,90 @@ class UnderpriceAlert(models.Model):
     std_deviations_below = models.FloatField()
     email_sent = models.BooleanField(default=False)
     email_sent_at = models.DateTimeField(null=True, blank=True)
+    hidden = models.BooleanField(default=False, help_text="Hide this alert from display")
     
     def __str__(self):
         return f"Alert for {self.item} in {self.price_watch.name}"
     
     class Meta:
         unique_together = ['price_watch', 'item']
+        indexes = [
+            models.Index(fields=['price_watch', 'hidden']),
+            models.Index(fields=['detected_at']),
+            models.Index(fields=['hidden']),
+            models.Index(fields=['email_sent']),
+        ]
         verbose_name = "Underprice Alert"
         verbose_name_plural = "Underprice Alerts"
         ordering = ['-detected_at']
+
+
+class PriceTrend(models.Model):
+    """Track price trends over time for analysis"""
+    price_watch = models.ForeignKey(PriceWatch, on_delete=models.CASCADE)
+    condition = models.IntegerField()
+    date = models.DateField()
+    avg_price = models.DecimalField(max_digits=10, decimal_places=2)
+    min_price = models.DecimalField(max_digits=10, decimal_places=2)
+    max_price = models.DecimalField(max_digits=10, decimal_places=2)
+    item_count = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.price_watch.name} - {self.date} - Condition {self.condition}"
+    
+    class Meta:
+        unique_together = ['price_watch', 'condition', 'date']
+        indexes = [
+            models.Index(fields=['price_watch', 'date']),
+            models.Index(fields=['date']),
+            models.Index(fields=['condition', 'date']),
+        ]
+        ordering = ['-date']
+
+
+class ScrapeActivity(models.Model):
+    """Track background task execution and scraping activity"""
+    TASK_TYPES = [
+        ('monitor', 'Monitor Price Watches'),
+        ('check_watch', 'Check Individual Watch'),
+        ('cleanup', 'Cleanup Old Items'),
+        ('token_refresh', 'Token Refresh'),
+        ('manual_index', 'Manual Index All'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('started', 'Started'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    task_type = models.CharField(max_length=20, choices=TASK_TYPES)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='started')
+    price_watch = models.ForeignKey(PriceWatch, on_delete=models.CASCADE, null=True, blank=True, help_text="Related watch (if applicable)")
+    items_processed = models.IntegerField(default=0, help_text="Number of items processed")
+    pages_fetched = models.IntegerField(default=0, help_text="Number of pages fetched from API")
+    new_items_found = models.IntegerField(default=0, help_text="Number of new items discovered")
+    alerts_generated = models.IntegerField(default=0, help_text="Number of new alerts generated")
+    error_message = models.TextField(blank=True, help_text="Error details if task failed")
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.FloatField(null=True, blank=True, help_text="Task duration in seconds")
+    
+    class Meta:
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['task_type', '-started_at']),
+            models.Index(fields=['status', '-started_at']),
+            models.Index(fields=['price_watch', '-started_at']),
+        ]
+    
+    def __str__(self):
+        watch_info = f" ({self.price_watch.name})" if self.price_watch else ""
+        return f"{self.get_task_type_display()}{watch_info} - {self.get_status_display()} at {self.started_at}"
+    
+    def save(self, *args, **kwargs):
+        # Calculate duration if completed
+        if self.completed_at and self.started_at:
+            self.duration_seconds = (self.completed_at - self.started_at).total_seconds()
+        super().save(*args, **kwargs)

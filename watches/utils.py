@@ -134,14 +134,15 @@ def process_item(item_data: Dict[str, Any], price_watch: PriceWatch) -> VintedIt
         if timestamp:
             try:
                 from datetime import datetime
+                import pytz
                 
                 # Handle Unix timestamp (integer)
                 if isinstance(timestamp, (int, float)):
-                    upload_date = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                    upload_date = datetime.fromtimestamp(timestamp, tz=pytz.UTC)
                 # Handle ISO string format
                 elif isinstance(timestamp, str):
                     if timestamp.isdigit():
-                        upload_date = datetime.fromtimestamp(int(timestamp), tz=timezone.utc)
+                        upload_date = datetime.fromtimestamp(int(timestamp), tz=pytz.UTC)
                     else:
                         upload_date = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                         
@@ -376,7 +377,7 @@ Vinted Price Watch Team
         logger.error(f"Error sending email alert: {e}")
 
 
-def fetch_and_process_items(price_watch: PriceWatch, max_pages: int = 1) -> int:
+def fetch_and_process_items(price_watch: PriceWatch, max_pages: int = 5) -> int:
     """
     Fetch items for a price watch and process them
     
@@ -385,6 +386,7 @@ def fetch_and_process_items(price_watch: PriceWatch, max_pages: int = 1) -> int:
         max_pages: Maximum number of pages to fetch (default: 1)
     """
     try:
+        print(f"🔍 Processing price watch: {price_watch.name} (fetching up to {max_pages} pages)")
         logger.info(f"Processing price watch: {price_watch.name} (max {max_pages} pages)")
         
         processed_count = 0
@@ -396,12 +398,14 @@ def fetch_and_process_items(price_watch: PriceWatch, max_pages: int = 1) -> int:
                 search_params = price_watch.search_parameters.copy()
                 search_params['page'] = page
                 
+                print(f"   📄 Fetching page {page}...")
                 logger.info(f"Fetching page {page} for watch {price_watch.name}")
                 
                 # Fetch items from Vinted API
                 items_data = vinted_api.search_items(search_params)
                 
                 if not items_data:
+                    print(f"   ⚠️ No items found on page {page}, stopping pagination")
                     logger.info(f"No items found on page {page}, stopping")
                     break
                 
@@ -411,6 +415,7 @@ def fetch_and_process_items(price_watch: PriceWatch, max_pages: int = 1) -> int:
                         if item:
                             processed_count += 1
                 
+                print(f"   ✅ Page {page}: {len(items_data)} items fetched")
                 logger.info(f"Processed page {page}: {len(items_data)} items")
                 
             except VintedAPIError as e:
@@ -423,6 +428,7 @@ def fetch_and_process_items(price_watch: PriceWatch, max_pages: int = 1) -> int:
         # Recalculate statistics after processing new items
         calculate_price_statistics(price_watch)
         
+        print(f"📊 Total processed: {processed_count} items for watch {price_watch.name}")
         logger.info(f"Processed total {processed_count} items for watch {price_watch.name}")
         return processed_count
         
