@@ -15,4 +15,9 @@ urlpatterns = [
     path('watches/<int:pk>/load-more/', views.load_more_underpriced, name='load_more_underpriced'),
     path('watches/<int:watch_id>/hide-item/<int:item_id>/', views.hide_underpriced_item, name='hide_underpriced_item'),
     path('api/parse-url/', views.parse_vinted_url, name='parse_vinted_url'),
+    
+    # Token management
+    path('token/inject/', views.token_injection_view, name='token_injection'),
+    path('token/clear/', views.clear_token_view, name='clear_token'),
+    path('api/status/', views.api_status_view, name='api_status'),
 ]

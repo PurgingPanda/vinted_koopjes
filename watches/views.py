@@ -8,12 +8,18 @@ from django.db.models import Count, Avg
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.core.serializers.json import DjangoJSONEncoder
+from django.core.cache import cache
+from django.urls import reverse
 from datetime import datetime, timedelta
 from django.utils import timezone
 import json
+import logging
 from .models import PriceWatch, VintedItem, UnderpriceAlert, PriceStatistics
 from .forms import PriceWatchForm
 from .utils import index_all_items, clear_and_reindex_items
+from .services import vinted_api, VintedAPIError
+
+logger = logging.getLogger(__name__)
 
 
 class PriceWatchListView(LoginRequiredMixin, ListView):
@@ -766,4 +772,134 @@ def hide_underpriced_item(request, watch_id, item_id):
         return JsonResponse({
             'success': False,
             'error': str(e)
+        }, status=500)
+
+
+@login_required
+def token_injection_view(request):
+    """Allow users to manually inject Vinted access tokens when auto-acquisition fails"""
+    if request.method == 'POST':
+        token = request.POST.get('access_token', '').strip()
+        duration = int(request.POST.get('duration', 3600))  # Default 1 hour
+        
+        if not token:
+            messages.error(request, 'Please provide a valid access token.')
+            return render(request, 'watches/inject_token.html')
+        
+        try:
+            # Store the token in cache with both primary and backup keys
+            cache.set('vinted_access_token', token, duration)
+            cache.set('vinted_backup_token', token, duration * 2)
+            
+            # Test the token by making a simple API call
+            test_result = vinted_api.test_connection()
+            
+            if test_result:
+                messages.success(request, 
+                    f'✅ Token successfully injected and verified! Valid for {duration//60} minutes.')
+                
+                # Log the successful token injection
+                logger.info(f"User {request.user.username} successfully injected Vinted token")
+                
+                return redirect('dashboard')
+            else:
+                messages.warning(request, 
+                    '⚠️ Token stored but verification failed. It may be expired or invalid.')
+                
+        except Exception as e:
+            messages.error(request, f'❌ Error testing token: {str(e)}')
+            logger.error(f"Token injection test failed for user {request.user.username}: {e}")
+    
+    # Show current token status
+    current_token = cache.get('vinted_access_token')
+    backup_token = cache.get('vinted_backup_token')
+    
+    # Check API status
+    api_status = {'working': False, 'error': 'No token available'}
+    if current_token:
+        try:
+            api_working = vinted_api.test_connection()
+            api_status = {
+                'working': api_working,
+                'error': None if api_working else 'Token validation failed'
+            }
+        except Exception as e:
+            api_status = {'working': False, 'error': str(e)}
+    
+    token_status = {
+        'has_token': bool(current_token),
+        'has_backup': bool(backup_token),
+        'token_preview': current_token[:20] + '...' if current_token else None,
+        'api_status': api_status
+    }
+    
+    return render(request, 'watches/inject_token.html', {'token_status': token_status})
+
+
+@login_required
+@require_POST
+def clear_token_view(request):
+    """Clear stored Vinted access token"""
+    try:
+        cache.delete('vinted_access_token')
+        cache.delete('vinted_backup_token')
+        messages.success(request, '✅ Token cleared successfully.')
+        logger.info(f"User {request.user.username} cleared Vinted token")
+    except Exception as e:
+        messages.error(request, f'❌ Error clearing token: {str(e)}')
+        logger.error(f"Token clearing failed for user {request.user.username}: {e}")
+    
+    return redirect('token_injection')
+
+
+@login_required
+def api_status_view(request):
+    """Check Vinted API connection status and token validity"""
+    try:
+        # Check if we have cached tokens
+        current_token = cache.get('vinted_access_token')
+        backup_token = cache.get('vinted_backup_token')
+        
+        status_data = {
+            'has_primary_token': bool(current_token),
+            'has_backup_token': bool(backup_token),
+            'token_preview': current_token[:20] + '...' if current_token else None,
+            'api_working': False,
+            'last_error': None,
+            'suggested_action': 'No action needed'
+        }
+        
+        # Test API connection if we have a token
+        if current_token:
+            try:
+                api_working = vinted_api.test_connection()
+                status_data['api_working'] = api_working
+                
+                if api_working:
+                    status_data['suggested_action'] = 'API is working correctly'
+                else:
+                    status_data['suggested_action'] = 'Token may be expired - try refreshing or manual injection'
+                    status_data['last_error'] = 'Token validation failed'
+                    
+            except VintedAPIError as e:
+                status_data['last_error'] = str(e)
+                if "403" in str(e) or "blocking" in str(e).lower():
+                    status_data['suggested_action'] = 'Vinted is blocking requests - manual token injection recommended'
+                elif "timeout" in str(e).lower():
+                    status_data['suggested_action'] = 'Network timeout - check internet connection or try again later'
+                else:
+                    status_data['suggested_action'] = 'Manual token injection recommended'
+            except Exception as e:
+                status_data['last_error'] = str(e)
+                status_data['suggested_action'] = 'Manual token injection recommended'
+        else:
+            status_data['suggested_action'] = 'No token available - manual injection required'
+            status_data['last_error'] = 'No access token found'
+        
+        return JsonResponse(status_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'suggested_action': 'Check logs for detailed error information'
         }, status=500)

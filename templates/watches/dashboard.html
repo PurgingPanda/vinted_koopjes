@@ -13,6 +13,42 @@
         </div>
     </div>
 
+    <!-- API Status Alert (Auto-hide if working) -->
+    <div id="api-status-alert" class="hidden">
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                </div>
+                <div class="ml-3 flex-1">
+                    <p class="text-sm text-yellow-700">
+                        <span id="api-status-message">Checking API status...</span>
+                    </p>
+                    <div class="mt-2">
+                        <div class="-mx-2 -my-1.5 flex">
+                            <a href="{% url 'token_injection' %}" class="bg-yellow-100 px-2 py-1.5 rounded-md text-sm font-medium text-yellow-800 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-yellow-50 focus:ring-yellow-600">
+                                🔑 Manage Token
+                            </a>
+                            <button type="button" class="ml-3 bg-yellow-100 px-2 py-1.5 rounded-md text-sm font-medium text-yellow-800 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-yellow-50 focus:ring-yellow-600" onclick="checkApiStatus()">
+                                🔄 Retry
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-shrink-0 ml-3">
+                    <button type="button" class="inline-flex bg-yellow-50 rounded-md p-1.5 text-yellow-500 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-yellow-50 focus:ring-yellow-600" onclick="dismissAlert()">
+                        <span class="sr-only">Dismiss</span>
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div class="bg-white overflow-hidden shadow rounded-lg">
@@ -447,6 +483,54 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     {% endif %}
+    
+    // API Status Checking
+    function checkApiStatus() {
+        fetch('{% url "api_status" %}')
+            .then(response => response.json())
+            .then(data => {
+                const alert = document.getElementById('api-status-alert');
+                const message = document.getElementById('api-status-message');
+                
+                if (!data.has_primary_token || !data.api_working) {
+                    let statusMessage = '';
+                    
+                    if (!data.has_primary_token) {
+                        statusMessage = '⚠️ No Vinted access token found. Background tasks cannot fetch new items.';
+                    } else if (!data.api_working) {
+                        if (data.last_error && data.last_error.includes('403')) {
+                            statusMessage = '🚫 Vinted is blocking automated access. Manual token injection required.';
+                        } else if (data.last_error && data.last_error.includes('timeout')) {
+                            statusMessage = '⏱️ API connection timeout. Check your internet connection.';
+                        } else {
+                            statusMessage = '❌ API connection failed. ' + (data.last_error || 'Token may be expired.');
+                        }
+                    }
+                    
+                    message.textContent = statusMessage + ' ' + data.suggested_action;
+                    alert.classList.remove('hidden');
+                } else {
+                    alert.classList.add('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Failed to check API status:', error);
+                const alert = document.getElementById('api-status-alert');
+                const message = document.getElementById('api-status-message');
+                message.textContent = '❌ Failed to check API status. Please refresh the page or check your connection.';
+                alert.classList.remove('hidden');
+            });
+    }
+    
+    function dismissAlert() {
+        document.getElementById('api-status-alert').classList.add('hidden');
+    }
+    
+    // Check API status on page load
+    checkApiStatus();
+    
+    // Auto-refresh API status every 2 minutes
+    setInterval(checkApiStatus, 120000);
 });
 </script>
 {% endblock %}

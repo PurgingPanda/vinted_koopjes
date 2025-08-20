@@ -1,0 +1,256 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Inject Vinted Token{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-2xl mx-auto">
+        <div class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">🔑 Manual Token Injection</h1>
+            <p class="text-gray-600">
+                When automatic token acquisition fails due to anti-bot protection, you can manually inject a valid Vinted access token here.
+            </p>
+        </div>
+
+        <!-- API Status Card -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">🔍 Current API Status</h2>
+            
+            <div id="api-status-container">
+                <div class="animate-pulse">
+                    <div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-3/4"></div>
+                </div>
+            </div>
+
+            <button id="refresh-status" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                🔄 Refresh Status
+            </button>
+        </div>
+
+        <!-- Token Status Card -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">🗂️ Token Status</h2>
+            
+            <div class="space-y-3">
+                {% if token_status.has_token %}
+                    <div class="flex items-center">
+                        <span class="inline-block w-3 h-3 bg-green-500 rounded-full mr-3"></span>
+                        <span class="text-gray-700">
+                            <strong>Primary Token:</strong> {{ token_status.token_preview }}
+                        </span>
+                    </div>
+                {% else %}
+                    <div class="flex items-center">
+                        <span class="inline-block w-3 h-3 bg-red-500 rounded-full mr-3"></span>
+                        <span class="text-gray-700"><strong>No primary token found</strong></span>
+                    </div>
+                {% endif %}
+
+                {% if token_status.has_backup %}
+                    <div class="flex items-center">
+                        <span class="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-3"></span>
+                        <span class="text-gray-700"><strong>Backup token:</strong> Available</span>
+                    </div>
+                {% else %}
+                    <div class="flex items-center">
+                        <span class="inline-block w-3 h-3 bg-gray-400 rounded-full mr-3"></span>
+                        <span class="text-gray-700"><strong>No backup token</strong></span>
+                    </div>
+                {% endif %}
+
+                {% if token_status.api_status %}
+                    <div class="mt-4 p-3 rounded-md {% if token_status.api_status.working %}bg-green-50 border border-green-200{% else %}bg-red-50 border border-red-200{% endif %}">
+                        {% if token_status.api_status.working %}
+                            <p class="text-green-800">✅ API connection is working</p>
+                        {% else %}
+                            <p class="text-red-800">❌ API connection failed</p>
+                            {% if token_status.api_status.error %}
+                                <p class="text-red-600 text-sm mt-1">{{ token_status.api_status.error }}</p>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if token_status.has_token %}
+                <form method="post" action="{% url 'clear_token' %}" class="mt-4">
+                    {% csrf_token %}
+                    <button type="submit" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors" onclick="return confirm('Are you sure you want to clear the current token?')">
+                        🗑️ Clear Current Token
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+
+        <!-- Token Injection Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">📥 Inject New Token</h2>
+            
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                
+                <div>
+                    <label for="access_token" class="block text-sm font-medium text-gray-700 mb-1">
+                        Vinted Access Token <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="password" 
+                        id="access_token" 
+                        name="access_token" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter your Vinted access_token_web cookie value..."
+                        required
+                    >
+                    <p class="text-sm text-gray-500 mt-1">
+                        This should be the value of the 'access_token_web' cookie from Vinted
+                    </p>
+                </div>
+
+                <div>
+                    <label for="duration" class="block text-sm font-medium text-gray-700 mb-1">
+                        Token Duration (seconds)
+                    </label>
+                    <select 
+                        id="duration" 
+                        name="duration" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="1800">30 minutes</option>
+                        <option value="3600" selected>1 hour</option>
+                        <option value="7200">2 hours</option>
+                        <option value="14400">4 hours</option>
+                        <option value="86400">24 hours</option>
+                    </select>
+                    <p class="text-sm text-gray-500 mt-1">
+                        How long should the token be cached before expiring
+                    </p>
+                </div>
+
+                <button 
+                    type="submit" 
+                    class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                >
+                    💉 Inject Token
+                </button>
+            </form>
+        </div>
+
+        <!-- Instructions Card -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-blue-900 mb-4">📖 How to Get Your Token</h2>
+            
+            <ol class="list-decimal list-inside space-y-3 text-blue-800">
+                <li>
+                    <strong>Open Vinted in your browser:</strong> Go to 
+                    <a href="https://www.vinted.be" target="_blank" class="underline hover:no-underline">https://www.vinted.be</a>
+                    and make sure you're logged in
+                </li>
+                <li>
+                    <strong>Open Developer Tools:</strong> Press <kbd class="px-2 py-1 bg-blue-200 rounded">F12</kbd> or right-click and select "Inspect"
+                </li>
+                <li>
+                    <strong>Go to Application/Storage tab:</strong> Look for "Cookies" in the left sidebar
+                </li>
+                <li>
+                    <strong>Find the token:</strong> Expand "https://www.vinted.be" and look for the cookie named 
+                    <code class="px-1 bg-blue-200 rounded">access_token_web</code>
+                </li>
+                <li>
+                    <strong>Copy the value:</strong> Copy the entire value of the cookie (it's usually very long)
+                </li>
+                <li>
+                    <strong>Paste it here:</strong> Paste the token value in the form above and click "Inject Token"
+                </li>
+            </ol>
+            
+            <div class="mt-4 p-3 bg-blue-100 rounded-md">
+                <p class="text-blue-800 text-sm">
+                    <strong>⚠️ Security Note:</strong> Only use tokens from your own Vinted account. 
+                    Never share your tokens with others as they provide access to your Vinted account.
+                </p>
+            </div>
+        </div>
+
+        <div class="mt-6 text-center">
+            <a href="{% url 'dashboard' %}" class="text-blue-600 hover:text-blue-800 font-medium">
+                ← Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-refresh API status
+function refreshApiStatus() {
+    const container = document.getElementById('api-status-container');
+    
+    // Show loading state
+    container.innerHTML = `
+        <div class="animate-pulse">
+            <div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+            <div class="h-3 bg-gray-200 rounded w-3/4"></div>
+        </div>
+    `;
+    
+    fetch('{% url "api_status" %}')
+        .then(response => response.json())
+        .then(data => {
+            let statusHtml = '';
+            
+            if (data.has_primary_token) {
+                const statusClass = data.api_working ? 'text-green-600' : 'text-red-600';
+                const statusIcon = data.api_working ? '✅' : '❌';
+                const statusText = data.api_working ? 'Working' : 'Failed';
+                
+                statusHtml += `
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-gray-700"><strong>Token:</strong> ${data.token_preview || 'Available'}</span>
+                        <span class="${statusClass}">${statusIcon} ${statusText}</span>
+                    </div>
+                `;
+                
+                if (data.last_error) {
+                    statusHtml += `
+                        <div class="text-sm text-red-600 mb-2">
+                            <strong>Error:</strong> ${data.last_error}
+                        </div>
+                    `;
+                }
+                
+                statusHtml += `
+                    <div class="text-sm text-blue-600">
+                        <strong>Suggested action:</strong> ${data.suggested_action}
+                    </div>
+                `;
+            } else {
+                statusHtml = `
+                    <div class="text-red-600 mb-2">❌ No token available</div>
+                    <div class="text-sm text-blue-600">
+                        <strong>Action needed:</strong> Manual token injection required
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = statusHtml;
+        })
+        .catch(error => {
+            container.innerHTML = `
+                <div class="text-red-600">❌ Failed to check API status</div>
+                <div class="text-sm text-gray-500">${error.message}</div>
+            `;
+        });
+}
+
+// Initial load and refresh button
+document.addEventListener('DOMContentLoaded', function() {
+    refreshApiStatus();
+    
+    document.getElementById('refresh-status').addEventListener('click', refreshApiStatus);
+});
+
+// Auto-refresh every 30 seconds
+setInterval(refreshApiStatus, 30000);
+</script>
+{% endblock %}
