@@ -1,0 +1,60 @@
+Watching for file changes with StatReloader
+[19/Aug/2025 22:20:02] "GET / HTTP/1.1" 200 60887
+Not Found: /favicon.ico
+[19/Aug/2025 22:20:08] "GET / HTTP/1.1" 200 60887
+[19/Aug/2025 22:20:40] "GET /watches/8/ HTTP/1.1" 200 162058
+[19/Aug/2025 22:22:27] "GET /watches/8/ HTTP/1.1" 200 168612
+[19/Aug/2025 22:22:57] "GET /watches/8/ HTTP/1.1" 200 168612
+[19/Aug/2025 22:23:02] "GET / HTTP/1.1" 200 62174
+/mnt/c/Users/fa990/Repos/vinted_koopjes/watches/views.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+August 19, 2025 - 22:19:57
+Django version 5.2.5, using settings 'vinted_koopjes.settings'
+Starting development server at http://127.0.0.1:8000/
+Quit the server with CONTROL-C.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
+Watching for file changes with StatReloader
+[19/Aug/2025 22:24:29] "GET / HTTP/1.1" 200 70200
+[19/Aug/2025 22:24:50] "GET / HTTP/1.1" 302 0
+[19/Aug/2025 22:24:50] "GET /accounts/login/?next=/ HTTP/1.1" 200 4351
+/mnt/c/Users/fa990/Repos/vinted_koopjes/watches/models.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+August 19, 2025 - 22:23:57
+Django version 5.2.5, using settings 'vinted_koopjes.settings'
+Starting development server at http://127.0.0.1:8000/
+Quit the server with CONTROL-C.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
+Watching for file changes with StatReloader
+[19/Aug/2025 22:25:45] "GET / HTTP/1.1" 200 71679
+/mnt/c/Users/fa990/Repos/vinted_koopjes/watches/models.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+August 19, 2025 - 22:25:14
+Django version 5.2.5, using settings 'vinted_koopjes.settings'
+Starting development server at http://127.0.0.1:8000/
+Quit the server with CONTROL-C.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
+Watching for file changes with StatReloader
+/mnt/c/Users/fa990/Repos/vinted_koopjes/watches/views.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+August 19, 2025 - 22:26:09
+Django version 5.2.5, using settings 'vinted_koopjes.settings'
+Starting development server at http://127.0.0.1:8000/
+Quit the server with CONTROL-C.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
+Watching for file changes with StatReloader

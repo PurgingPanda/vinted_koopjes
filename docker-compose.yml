@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+    command: python manage.py runserver 0.0.0.0:8000
+    depends_on:
+      - tasks
+
+  tasks:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+    command: python manage.py process_tasks
+    restart: always

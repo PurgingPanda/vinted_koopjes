@@ -1,5 +1,7 @@
 {
   "dependencies": {
-    "@playwright/test": "^1.54.2"
+    "@playwright/test": "^1.54.2",
+    "commander": "^14.0.0",
+    "jq": "^1.7.2"
   }
 }
