@@ -1,0 +1,52 @@
+[project]
+name = "vinted_scraper"
+version = "3.0.0a2"
+description = "A very simple Python package that scrapes the Vinted website to retrieve information about its items."
+readme = "README.md"
+requires-python = ">= 3.6"
+license = { file = "LICENSE" }
+authors = [{ name = "Giglium" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Education",
+]
+
+dependencies = [
+    "dataclasses>=0.8 ; python_full_version == '3.6.*'",
+    "httpx>=0.20.0 ; python_full_version >= '3.7'",
+    "requests>=2.27.1 ; python_full_version >= '3.6'",
+]
+
+[tool.isort]
+profile = "black"
+
+[project.urls]
+Changelog = "https://github.com/Giglium/vinted_scraper/releases"
+Documentation = "https://github.com/Giglium/vinted_scraper"
+Homepage = "https://github.com/Giglium/vinted_scraper"
+Issues = "https://github.com/Giglium/vinted_scraper/issues"
+Source = "https://github.com/Giglium/vinted_scraper"
+
+[build-system]
+requires = ["uv_build>=0.8.5,<0.9.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "black==25.1.0 ; python_full_version == '3.13.*'",
+    "coverage>=6.2",
+    "isort==6.0.1 ; python_full_version == '3.13.*'",
+    "no-implicit-optional>=1.4 ; python_full_version >= '3.7'",
+    "pdoc>=15.0.4 ; python_full_version >= '3.13'",
+]
