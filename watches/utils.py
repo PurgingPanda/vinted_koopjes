@@ -9,7 +9,7 @@ import statistics
 import math
 
 from .models import PriceWatch, VintedItem, PriceStatistics, UnderpriceAlert
-from .services import vinted_api, VintedAPIError
+from .services import VintedAPI, VintedAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +121,12 @@ def process_item(item_data: Dict[str, Any], price_watch: PriceWatch) -> VintedIt
         color = item_data.get('color', '') or item_data.get('colour', '')
         description = item_data.get('description', '')
         
+        # Extract seller information
+        user_data = item_data.get('user', {})
+        seller_id = user_data.get('id') if user_data else None
+        seller_login = user_data.get('login', '') if user_data else ''
+        seller_business = user_data.get('is_business_account', False) if user_data else False
+        
         # Extract upload date from timestamp
         upload_date = None
         timestamp = None
@@ -149,6 +155,22 @@ def process_item(item_data: Dict[str, Any], price_watch: PriceWatch) -> VintedIt
             except (ValueError, AttributeError, OSError) as e:
                 logger.warning(f"Could not parse timestamp for item {vinted_id}: {timestamp} - {e}")
         
+        # Extract additional API fields
+        favourite_count = item_data.get('favourite_count')
+        view_count = item_data.get('view_count') 
+        
+        # Extract service fee
+        service_fee_data = item_data.get('service_fee', {})
+        service_fee = None
+        if isinstance(service_fee_data, dict) and 'amount' in service_fee_data:
+            service_fee = Decimal(str(service_fee_data['amount']))
+        
+        # Extract total item price
+        total_item_price_data = item_data.get('total_item_price', {})
+        total_item_price = None
+        if isinstance(total_item_price_data, dict) and 'amount' in total_item_price_data:
+            total_item_price = Decimal(str(total_item_price_data['amount']))
+        
         # Get or create item
         item, created = VintedItem.objects.get_or_create(
             vinted_id=vinted_id,
@@ -161,6 +183,13 @@ def process_item(item_data: Dict[str, Any], price_watch: PriceWatch) -> VintedIt
                 'color': color,
                 'description': description,
                 'upload_date': upload_date,
+                'seller_id': seller_id,
+                'seller_login': seller_login,
+                'seller_business': seller_business,
+                'favourite_count': favourite_count,
+                'view_count': view_count,
+                'service_fee': service_fee,
+                'total_item_price': total_item_price,
                 'api_response': item_data,
                 'is_active': True
             }
@@ -176,6 +205,13 @@ def process_item(item_data: Dict[str, Any], price_watch: PriceWatch) -> VintedIt
             item.color = color
             item.description = description
             item.upload_date = upload_date
+            item.seller_id = seller_id
+            item.seller_login = seller_login
+            item.seller_business = seller_business
+            item.favourite_count = favourite_count
+            item.view_count = view_count
+            item.service_fee = service_fee
+            item.total_item_price = total_item_price
             item.api_response = item_data
             item.last_seen = timezone.now()
             item.is_active = True
@@ -190,7 +226,10 @@ def process_item(item_data: Dict[str, Any], price_watch: PriceWatch) -> VintedIt
         return item
         
     except Exception as e:
+        import traceback
         logger.error(f"Error processing item {item_data.get('id', 'unknown')}: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        print(f"🚨 ERROR processing item {item_data.get('id', 'unknown')}: {e}")
         return None
 
 
@@ -398,10 +437,15 @@ def fetch_and_process_items(price_watch: PriceWatch, max_pages: int = 5) -> int:
                 search_params = price_watch.search_parameters.copy()
                 search_params['page'] = page
                 
+                # Set default order to newest_first if not specified
+                if 'order' not in search_params:
+                    search_params['order'] = 'newest_first'
+                
                 print(f"   📄 Fetching page {page}...")
                 logger.info(f"Fetching page {page} for watch {price_watch.name}")
                 
                 # Fetch items from Vinted API
+                vinted_api = VintedAPI()
                 items_data = vinted_api.search_items(search_params)
                 
                 if not items_data:
@@ -409,18 +453,49 @@ def fetch_and_process_items(price_watch: PriceWatch, max_pages: int = 5) -> int:
                     logger.info(f"No items found on page {page}, stopping")
                     break
                 
-                with transaction.atomic():
-                    for item_data in items_data:
-                        item = process_item(item_data, price_watch)
-                        if item:
-                            processed_count += 1
+                for item_data in items_data:
+                    try:
+                        with transaction.atomic():
+                            print(f"🔄 Processing item {item_data.get('id', 'unknown')}...")
+                            item = process_item(item_data, price_watch)
+                            if item:
+                                processed_count += 1
+                                print(f"✅ Successfully processed item {item.vinted_id}")
+                            else:
+                                print(f"❌ process_item returned None for item {item_data.get('id', 'unknown')}")
+                    except Exception as e:
+                        import traceback
+                        logger.error(f"Failed to process item in transaction: {e}")
+                        logger.error(f"Transaction traceback: {traceback.format_exc()}")
+                        print(f"🚨 TRANSACTION ERROR for item {item_data.get('id', 'unknown')}: {e}")
+                        continue
                 
                 print(f"   ✅ Page {page}: {len(items_data)} items fetched")
                 logger.info(f"Processed page {page}: {len(items_data)} items")
                 
+                # Add human-like delay between pages (except for the last page)
+                if page < max_pages and len(items_data) > 0:
+                    import random
+                    import time
+                    
+                    # Normal distribution with mean=30, std_dev=8 (most delays between 14-46 seconds)
+                    delay = max(5, random.normalvariate(30, 8))  # Minimum 5 seconds
+                    delay = min(delay, 60)  # Maximum 60 seconds
+                    
+                    print(f"   ⏳ Waiting {delay:.1f} seconds before next page...")
+                    logger.info(f"Waiting {delay:.1f} seconds before fetching page {page + 1}")
+                    time.sleep(delay)
+                
             except VintedAPIError as e:
-                logger.error(f"Vinted API error on page {page} for watch {price_watch.name}: {e}")
-                break
+                error_msg = str(e).lower()
+                if "403" in error_msg or "blocking" in error_msg:
+                    print(f"   🔒 Temporary blocking detected on page {page}, skipping remaining pages")
+                    logger.warning(f"Temporary blocking on page {page} for watch {price_watch.name}: {e}")
+                    # Don't break completely, just stop this watch and continue with others
+                    break
+                else:
+                    logger.error(f"Vinted API error on page {page} for watch {price_watch.name}: {e}")
+                    break
             except Exception as e:
                 logger.error(f"Error processing page {page} for watch {price_watch.name}: {e}")
                 break

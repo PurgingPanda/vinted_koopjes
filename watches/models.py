@@ -52,6 +52,17 @@ class VintedItem(models.Model):
     description = models.TextField(null=True, blank=True)
     upload_date = models.DateTimeField(null=True, blank=True, help_text="When the item was uploaded to Vinted (from API timestamp)")
     
+    # Seller information
+    seller_id = models.IntegerField(null=True, blank=True, help_text="Vinted user ID of the seller")
+    seller_login = models.CharField(max_length=200, null=True, blank=True, help_text="Seller's username/login")
+    seller_business = models.BooleanField(default=False, help_text="Whether seller is a business account")
+    
+    # Additional API fields
+    favourite_count = models.IntegerField(null=True, blank=True, help_text="Number of users who favorited this item")
+    view_count = models.IntegerField(null=True, blank=True, help_text="Number of times this item was viewed")
+    service_fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Vinted's service fee for this item")
+    total_item_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Total price including fees")
+    
     # Complete API response for additional data
     api_response = models.JSONField()
     first_seen = models.DateTimeField(auto_now_add=True)
@@ -78,6 +89,8 @@ class VintedItem(models.Model):
             models.Index(fields=['vinted_id']),
             models.Index(fields=['upload_date']),
             models.Index(fields=['first_seen']),
+            models.Index(fields=['seller_id']),
+            models.Index(fields=['seller_login']),
             models.Index(fields=['last_seen']),
             models.Index(fields=['is_active']),
             models.Index(fields=['condition', 'upload_date']),
@@ -198,3 +211,5 @@ class ScrapeActivity(models.Model):
         if self.completed_at and self.started_at:
             self.duration_seconds = (self.completed_at - self.started_at).total_seconds()
         super().save(*args, **kwargs)
+
+

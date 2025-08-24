@@ -17,7 +17,7 @@ import logging
 from .models import PriceWatch, VintedItem, UnderpriceAlert, PriceStatistics
 from .forms import PriceWatchForm
 from .utils import index_all_items, clear_and_reindex_items
-from .services import vinted_api, VintedAPIError
+from .services import VintedAPI, VintedAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,10 @@ class PriceWatchListView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
+        if self.request.user.is_superuser:
+            return PriceWatch.objects.all().annotate(
+                alert_count=Count('underpricealert')
+            )
         return PriceWatch.objects.filter(user=self.request.user).annotate(
             alert_count=Count('underpricealert')
         )
@@ -52,6 +56,8 @@ class PriceWatchUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'watches/form.html'
 
     def get_queryset(self):
+        if self.request.user.is_superuser:
+            return PriceWatch.objects.all()
         return PriceWatch.objects.filter(user=self.request.user)
 
     def get_success_url(self):
@@ -99,6 +105,8 @@ class PriceWatchDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'watch'
 
     def get_queryset(self):
+        if self.request.user.is_superuser:
+            return PriceWatch.objects.all()
         return PriceWatch.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
@@ -133,6 +141,9 @@ class PriceWatchDetailView(LoginRequiredMixin, DetailView):
         histogram_data = self.get_histogram_data(watch)
         context['histogram_data'] = histogram_data
         context['histogram_data_json'] = json.dumps(histogram_data, cls=DjangoJSONEncoder)
+        
+        # Add top sellers with items below mean price
+        context['top_sellers_below_mean'] = self.get_top_sellers_below_mean(watch)
         
         return context
     
@@ -203,6 +214,7 @@ class PriceWatchDetailView(LoginRequiredMixin, DetailView):
                     'upload_date': item.upload_date,
                     'url': api_data.get('url', f'https://www.vinted.be/items/{item.vinted_id}'),
                     'photo_url': api_data.get('photo', {}).get('url') if api_data.get('photo') else None,
+                    'favourite_count': item.favourite_count or 0,
                     'is_highlighted': is_highlighted
                 }
                 
@@ -289,6 +301,107 @@ class PriceWatchDetailView(LoginRequiredMixin, DetailView):
             }
         
         return histogram_data
+    
+    def get_top_sellers_below_mean(self, watch, limit=10):
+        """Get top sellers who have the most items selling below mean price"""
+        from django.db.models import Count, Avg, F, Case, When, IntegerField
+        from .utils import is_item_blacklisted
+        
+        # Get statistics for each condition
+        stats_by_condition = {
+            stat.condition: stat for stat in 
+            PriceStatistics.objects.filter(price_watch=watch)
+        }
+        
+        if not stats_by_condition:
+            return []
+        
+        # Get all items with seller info, excluding blacklisted ones
+        all_items = watch.items.exclude(seller_id__isnull=True).select_related()
+        
+        # Filter out blacklisted items
+        valid_items = []
+        for item in all_items:
+            # Create item_data for blacklist check
+            item_data = {
+                'title': item.title or '',
+                'description': item.description or '',
+                'brand_title': item.brand or '',
+            }
+            if not is_item_blacklisted(item_data, watch):
+                valid_items.append(item)
+        
+        # Group by seller and calculate stats
+        seller_stats = {}
+        
+        for item in valid_items:
+            if item.condition not in stats_by_condition:
+                continue
+                
+            stats = stats_by_condition[item.condition]
+            mean_price = float(stats.mean_price)
+            item_price = float(item.price)
+            
+            # Check if item is below mean price
+            is_below_mean = item_price < mean_price
+            
+            seller_key = (item.seller_id, item.seller_login)
+            if seller_key not in seller_stats:
+                seller_stats[seller_key] = {
+                    'seller_id': item.seller_id,
+                    'seller_login': item.seller_login or f'User {item.seller_id}',
+                    'seller_business': item.seller_business,
+                    'total_items': 0,
+                    'below_mean_items': 0,
+                    'total_value': 0.0,
+                    'below_mean_value': 0.0,
+                    'avg_price': 0.0,
+                    'avg_discount_percent': 0.0,
+                    'items_below_mean': []  # Store actual items below mean
+                }
+            
+            seller_stats[seller_key]['total_items'] += 1
+            seller_stats[seller_key]['total_value'] += item_price
+            
+            if is_below_mean:
+                seller_stats[seller_key]['below_mean_items'] += 1
+                seller_stats[seller_key]['below_mean_value'] += item_price
+                discount_percent = ((mean_price - item_price) / mean_price) * 100
+                seller_stats[seller_key]['avg_discount_percent'] += discount_percent
+                
+                # Store the item info
+                api_data = item.api_response or {}
+                item_info = {
+                    'item': item,
+                    'price': item_price,
+                    'mean_price': mean_price,
+                    'discount_percent': discount_percent,
+                    'condition_name': item.get_condition_display(),
+                    'title': item.title or f'Item {item.vinted_id}',
+                    'brand': item.brand or 'Unknown',
+                    'size': item.size or '',
+                    'url': api_data.get('url', f'https://www.vinted.be/items/{item.vinted_id}'),
+                    'photo_url': api_data.get('photo', {}).get('url') if api_data.get('photo') else None,
+                    'favourite_count': item.favourite_count or 0,
+                }
+                seller_stats[seller_key]['items_below_mean'].append(item_info)
+        
+        # Calculate final stats and filter sellers with at least 2 items below mean
+        results = []
+        for stats in seller_stats.values():
+            if stats['below_mean_items'] >= 2:  # At least 2 items below mean
+                stats['avg_price'] = stats['total_value'] / stats['total_items']
+                stats['below_mean_percentage'] = (stats['below_mean_items'] / stats['total_items']) * 100
+                if stats['below_mean_items'] > 0:
+                    stats['avg_discount_percent'] = stats['avg_discount_percent'] / stats['below_mean_items']
+                else:
+                    stats['avg_discount_percent'] = 0
+                results.append(stats)
+        
+        # Sort by number of items below mean (descending), then by percentage
+        results.sort(key=lambda x: (x['below_mean_items'], x['below_mean_percentage']), reverse=True)
+        
+        return results[:limit]
 
 
 class PriceWatchDeleteView(LoginRequiredMixin, DeleteView):
@@ -297,6 +410,8 @@ class PriceWatchDeleteView(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy('watch_list')
 
     def get_queryset(self):
+        if self.request.user.is_superuser:
+            return PriceWatch.objects.all()
         return PriceWatch.objects.filter(user=self.request.user)
 
     def delete(self, request, *args, **kwargs):
@@ -371,6 +486,7 @@ def get_watch_outliers(watch, limit=None):
                     'upload_date': item.upload_date,
                     'url': api_data.get('url', f'https://www.vinted.be/items/{item.vinted_id}'),
                     'photo_url': api_data.get('photo', {}).get('url') if api_data.get('photo') else None,
+                    'favourite_count': item.favourite_count or 0,
                     'is_highlighted': is_highlighted
                 }
                 
@@ -442,18 +558,35 @@ def dashboard(request):
     if items_limit not in [25, 50, 100, 500]:
         items_limit = 25
     
-    watches = PriceWatch.objects.filter(user=request.user).annotate(
-        alert_count=Count('underpricealert')
-    )[:5]
+    # Get sorting method from request parameter
+    sort_by = request.GET.get('sort', 'most_underpriced')
+    if sort_by not in ['most_underpriced', 'newest_underpriced', 'oldest_underpriced']:
+        sort_by = 'most_underpriced'
     
-    recent_alerts = UnderpriceAlert.objects.filter(
-        price_watch__user=request.user,
-        hidden=False  # Exclude hidden alerts
-    ).select_related('item', 'price_watch')[:10]
+    if request.user.is_superuser:
+        watches = PriceWatch.objects.all().annotate(
+            alert_count=Count('underpricealert')
+        )[:5]
+        
+        recent_alerts = UnderpriceAlert.objects.filter(
+            hidden=False  # Exclude hidden alerts
+        ).select_related('item', 'price_watch')[:10]
+    else:
+        watches = PriceWatch.objects.filter(user=request.user).annotate(
+            alert_count=Count('underpricealert')
+        )[:5]
+        
+        recent_alerts = UnderpriceAlert.objects.filter(
+            price_watch__user=request.user,
+            hidden=False  # Exclude hidden alerts
+        ).select_related('item', 'price_watch')[:10]
     
     # Get most underpriced items from all user's watches
     most_underpriced = []
-    user_watches = PriceWatch.objects.filter(user=request.user).prefetch_related('items')
+    if request.user.is_superuser:
+        user_watches = PriceWatch.objects.all().prefetch_related('items')
+    else:
+        user_watches = PriceWatch.objects.filter(user=request.user).prefetch_related('items')
     
     if user_watches:
         # Get more items per watch to ensure we have enough candidates
@@ -464,24 +597,46 @@ def dashboard(request):
             watch_outliers = get_watch_outliers(watch, limit=items_per_watch)
             most_underpriced.extend(watch_outliers.get('underpriced', []))
     
-    # Sort all underpriced items by z-score (most underpriced first) and take requested amount
-    most_underpriced.sort(key=lambda x: x['z_score'])
+    # Apply sorting based on user selection
+    if sort_by == 'most_underpriced':
+        # Sort by z-score (most underpriced first - lowest z-score)
+        most_underpriced.sort(key=lambda x: x['z_score'])
+    elif sort_by == 'newest_underpriced':
+        # Sort by upload date (newest first) but only include items below threshold
+        # Filter to only significantly underpriced items (z-score < -1.5)
+        most_underpriced = [x for x in most_underpriced if x['z_score'] < -1.5]
+        most_underpriced.sort(key=lambda x: x['item'].upload_date or x['item'].first_seen, reverse=True)
+    elif sort_by == 'oldest_underpriced':
+        # Sort by upload date (oldest first) but only include items below threshold
+        # Filter to only significantly underpriced items (z-score < -1.5)
+        most_underpriced = [x for x in most_underpriced if x['z_score'] < -1.5]
+        most_underpriced.sort(key=lambda x: x['item'].upload_date or x['item'].first_seen)
+    
+    # Take only the requested number of items
     most_underpriced = most_underpriced[:items_limit]
     
     # Get recent items for live feed
-    recent_items = VintedItem.objects.filter(
-        watches__user=request.user
-    ).select_related().order_by('-first_seen')[:10]
+    if request.user.is_superuser:
+        recent_items = VintedItem.objects.all().select_related().order_by('-first_seen')[:10]
+    else:
+        recent_items = VintedItem.objects.filter(
+            watches__user=request.user
+        ).select_related().order_by('-first_seen')[:10]
     
     # Get price trend data for charts (last 30 days)
     from datetime import date, timedelta
     from .models import PriceTrend
     
     thirty_days_ago = date.today() - timedelta(days=30)
-    price_trends = PriceTrend.objects.filter(
-        price_watch__user=request.user,
-        date__gte=thirty_days_ago
-    ).order_by('date')
+    if request.user.is_superuser:
+        price_trends = PriceTrend.objects.filter(
+            date__gte=thirty_days_ago
+        ).order_by('date')
+    else:
+        price_trends = PriceTrend.objects.filter(
+            price_watch__user=request.user,
+            date__gte=thirty_days_ago
+        ).order_by('date')
     
     # Organize trend data by watch and condition
     trend_data = {}
@@ -500,15 +655,23 @@ def dashboard(request):
             'item_count': trend.item_count
         })
     
-    stats = {
-        'total_watches': PriceWatch.objects.filter(user=request.user).count(),
-        'active_watches': PriceWatch.objects.filter(user=request.user, is_active=True).count(),
-        'total_alerts': UnderpriceAlert.objects.filter(price_watch__user=request.user).count(),
-        'unsent_alerts': UnderpriceAlert.objects.filter(
-            price_watch__user=request.user, 
-            email_sent=False
-        ).count(),
-    }
+    if request.user.is_superuser:
+        stats = {
+            'total_watches': PriceWatch.objects.count(),
+            'active_watches': PriceWatch.objects.filter(is_active=True).count(),
+            'total_alerts': UnderpriceAlert.objects.count(),
+            'unsent_alerts': UnderpriceAlert.objects.filter(email_sent=False).count(),
+        }
+    else:
+        stats = {
+            'total_watches': PriceWatch.objects.filter(user=request.user).count(),
+            'active_watches': PriceWatch.objects.filter(user=request.user, is_active=True).count(),
+            'total_alerts': UnderpriceAlert.objects.filter(price_watch__user=request.user).count(),
+            'unsent_alerts': UnderpriceAlert.objects.filter(
+                price_watch__user=request.user, 
+                email_sent=False
+            ).count(),
+        }
     
     context = {
         'watches': watches,
@@ -517,6 +680,7 @@ def dashboard(request):
         'recent_items': recent_items,
         'stats': stats,
         'items_limit': items_limit,
+        'sort_by': sort_by,
         'trend_data': trend_data,
         'trend_data_json': json.dumps(trend_data, cls=DjangoJSONEncoder),
     }
@@ -527,7 +691,10 @@ def dashboard(request):
 @login_required
 def test_watch_api(request, pk):
     """Test API for a specific price watch"""
-    watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
+    if request.user.is_superuser:
+        watch = get_object_or_404(PriceWatch, pk=pk)
+    else:
+        watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
     
     if request.method == 'POST':
         try:
@@ -591,7 +758,10 @@ def index_all_watch_items(request, pk):
         return JsonResponse({'success': False, 'error': 'POST request required'})
     
     try:
-        watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
+        if request.user.is_superuser:
+            watch = get_object_or_404(PriceWatch, pk=pk)
+        else:
+            watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
         
         # Get current item count
         current_count = watch.items.count()
@@ -624,7 +794,10 @@ def load_more_underpriced(request, pk):
         return JsonResponse({'success': False, 'error': 'GET request required'})
     
     try:
-        watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
+        if request.user.is_superuser:
+            watch = get_object_or_404(PriceWatch, pk=pk)
+        else:
+            watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
         
         # Get pagination parameters
         offset = int(request.GET.get('offset', 0))
@@ -688,7 +861,10 @@ def clear_and_reindex_watch_items(request, pk):
         return JsonResponse({'success': False, 'error': 'POST request required'})
     
     try:
-        watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
+        if request.user.is_superuser:
+            watch = get_object_or_404(PriceWatch, pk=pk)
+        else:
+            watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
         
         # Perform clear and re-index
         result = clear_and_reindex_items(watch)
@@ -722,7 +898,10 @@ def clear_alerts(request, pk):
         return JsonResponse({'success': False, 'error': 'POST request required'})
     
     try:
-        watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
+        if request.user.is_superuser:
+            watch = get_object_or_404(PriceWatch, pk=pk)
+        else:
+            watch = get_object_or_404(PriceWatch, pk=pk, user=request.user)
         
         # Count alerts before clearing
         alerts_count = UnderpriceAlert.objects.filter(price_watch=watch).count()
@@ -747,7 +926,10 @@ def clear_alerts(request, pk):
 def hide_underpriced_item(request, watch_id, item_id):
     """Hide an underpriced item by marking the alert as hidden"""
     try:
-        watch = get_object_or_404(PriceWatch, pk=watch_id, user=request.user)
+        if request.user.is_superuser:
+            watch = get_object_or_404(PriceWatch, pk=watch_id)
+        else:
+            watch = get_object_or_404(PriceWatch, pk=watch_id, user=request.user)
         item = get_object_or_404(VintedItem, vinted_id=item_id)
         
         # Find or create the alert for this watch and item
@@ -778,46 +960,86 @@ def hide_underpriced_item(request, watch_id, item_id):
 @login_required
 def token_injection_view(request):
     """Allow users to manually inject Vinted access tokens when auto-acquisition fails"""
+    
+    # Check for pre-filled values from URL parameters (for browser extension)
+    prefill_access_token = request.GET.get('access_token', '').strip()
+    prefill_session_token = request.GET.get('session_token', '').strip()
+    
     if request.method == 'POST':
-        token = request.POST.get('access_token', '').strip()
+        access_token = request.POST.get('access_token', '').strip()
+        session_token = request.POST.get('session_token', '').strip()
+        expiration_type = request.POST.get('expiration_type', 'timed')
         duration = int(request.POST.get('duration', 3600))  # Default 1 hour
         
-        if not token:
-            messages.error(request, 'Please provide a valid access token.')
+        if not access_token or not session_token:
+            messages.error(request, 'Please provide both access token and session token.')
             return render(request, 'watches/inject_token.html')
         
+        # Determine if tokens should never expire
+        never_expire = (expiration_type == 'never')
+        
         try:
-            # Store the token in cache with both primary and backup keys
-            cache.set('vinted_access_token', token, duration)
-            cache.set('vinted_backup_token', token, duration * 2)
+            # Store both tokens in database
+            from .models import VintedToken
+            VintedToken.set_tokens(access_token, session_token, never_expire=never_expire)
+            
+            # Also store in cache for backward compatibility
+            cache.set('vinted_access_token', access_token, duration)
+            cache.set('vinted_session_token', session_token, duration)
+            cache.set('vinted_backup_token', access_token, duration * 2)
             
             # Test the token by making a simple API call
+            vinted_api = VintedAPI()
             test_result = vinted_api.test_connection()
             
             if test_result:
-                messages.success(request, 
-                    f'✅ Token successfully injected and verified! Valid for {duration//60} minutes.')
+                if never_expire:
+                    messages.success(request, 
+                        '✅ Both tokens successfully injected and verified! Set to never expire (only invalidated when rejected by Vinted).')
+                else:
+                    messages.success(request, 
+                        f'✅ Both tokens successfully injected and verified! Valid for {duration//60} minutes.')
                 
                 # Log the successful token injection
-                logger.info(f"User {request.user.username} successfully injected Vinted token")
+                expire_info = "never expire" if never_expire else f"{duration//60} minutes"
+                logger.info(f"User {request.user.username} successfully injected Vinted tokens (access + session) - {expire_info}")
                 
                 return redirect('dashboard')
             else:
                 messages.warning(request, 
-                    '⚠️ Token stored but verification failed. It may be expired or invalid.')
+                    '⚠️ Tokens stored but verification failed. They may be expired or invalid.')
                 
         except Exception as e:
             messages.error(request, f'❌ Error testing token: {str(e)}')
             logger.error(f"Token injection test failed for user {request.user.username}: {e}")
     
-    # Show current token status
-    current_token = cache.get('vinted_access_token')
+    # Show current token status from database
+    from .models import VintedToken
+    
+    try:
+        access_token_obj = VintedToken.objects.filter(token_type='access').first()
+        session_token_obj = VintedToken.objects.filter(token_type='session').first()
+    except Exception:
+        access_token_obj = None
+        session_token_obj = None
+    
+    # Fallback to cache for backward compatibility
+    current_token = access_token_obj.value if access_token_obj else cache.get('vinted_access_token')
+    session_token = session_token_obj.value if session_token_obj else cache.get('vinted_session_token')
     backup_token = cache.get('vinted_backup_token')
+    
+    # Check for token errors
+    token_errors = []
+    if access_token_obj and not access_token_obj.is_valid:
+        token_errors.append(f"Access token: {access_token_obj.last_error}")
+    if session_token_obj and not session_token_obj.is_valid:
+        token_errors.append(f"Session token: {session_token_obj.last_error}")
     
     # Check API status
     api_status = {'working': False, 'error': 'No token available'}
     if current_token:
         try:
+            vinted_api = VintedAPI()
             api_working = vinted_api.test_connection()
             api_status = {
                 'working': api_working,
@@ -828,12 +1050,25 @@ def token_injection_view(request):
     
     token_status = {
         'has_token': bool(current_token),
+        'has_session_token': bool(session_token),
         'has_backup': bool(backup_token),
         'token_preview': current_token[:20] + '...' if current_token else None,
-        'api_status': api_status
+        'session_token_preview': session_token[:20] + '...' if session_token else None,
+        'api_status': api_status,
+        'access_token_valid': access_token_obj.is_valid if access_token_obj else True,
+        'session_token_valid': session_token_obj.is_valid if session_token_obj else True,
+        'token_errors': token_errors,
+        'access_token_error_count': access_token_obj.error_count if access_token_obj else 0,
+        'session_token_error_count': session_token_obj.error_count if session_token_obj else 0,
     }
     
-    return render(request, 'watches/inject_token.html', {'token_status': token_status})
+    context = {
+        'token_status': token_status,
+        'prefill_access_token': prefill_access_token,
+        'prefill_session_token': prefill_session_token,
+    }
+    
+    return render(request, 'watches/inject_token.html', context)
 
 
 @login_required
@@ -841,10 +1076,17 @@ def token_injection_view(request):
 def clear_token_view(request):
     """Clear stored Vinted access token"""
     try:
+        # Clear database tokens
+        from .models import VintedToken
+        VintedToken.objects.all().delete()
+        
+        # Clear cache tokens
         cache.delete('vinted_access_token')
+        cache.delete('vinted_session_token')
         cache.delete('vinted_backup_token')
-        messages.success(request, '✅ Token cleared successfully.')
-        logger.info(f"User {request.user.username} cleared Vinted token")
+        
+        messages.success(request, '✅ All tokens cleared successfully.')
+        logger.info(f"User {request.user.username} cleared Vinted tokens")
     except Exception as e:
         messages.error(request, f'❌ Error clearing token: {str(e)}')
         logger.error(f"Token clearing failed for user {request.user.username}: {e}")
@@ -854,47 +1096,46 @@ def clear_token_view(request):
 
 @login_required
 def api_status_view(request):
-    """Check Vinted API connection status and token validity"""
+    """Check Vinted API connection status using vinted_scraper"""
     try:
-        # Check if we have cached tokens
-        current_token = cache.get('vinted_access_token')
-        backup_token = cache.get('vinted_backup_token')
+        # Check if there's an optional manual session cookie in cache
+        manual_session_cookie = cache.get('vinted_access_token')
         
         status_data = {
-            'has_primary_token': bool(current_token),
-            'has_backup_token': bool(backup_token),
-            'token_preview': current_token[:20] + '...' if current_token else None,
+            'has_primary_token': True,  # vinted_scraper handles tokens automatically
+            'has_session_token': bool(manual_session_cookie),
+            'has_backup_token': False,  # Not needed with vinted_scraper
+            'token_preview': 'Auto-managed by vinted_scraper',
+            'session_token_preview': manual_session_cookie[:20] + '...' if manual_session_cookie else None,
             'api_working': False,
             'last_error': None,
-            'suggested_action': 'No action needed'
+            'suggested_action': 'vinted_scraper handles everything automatically',
+            'has_invalid_db_tokens': False
         }
         
-        # Test API connection if we have a token
-        if current_token:
-            try:
-                api_working = vinted_api.test_connection()
-                status_data['api_working'] = api_working
+        # Test API connection using the working scraper
+        try:
+            vinted_api = VintedAPI()
+            api_working = vinted_api.test_connection()
+            status_data['api_working'] = api_working
+            
+            if api_working:
+                status_data['suggested_action'] = '✅ vinted_scraper is working correctly'
+            else:
+                status_data['suggested_action'] = '⚠️ Connection test failed - check logs'
+                status_data['last_error'] = 'Connection test returned no results'
                 
-                if api_working:
-                    status_data['suggested_action'] = 'API is working correctly'
-                else:
-                    status_data['suggested_action'] = 'Token may be expired - try refreshing or manual injection'
-                    status_data['last_error'] = 'Token validation failed'
-                    
-            except VintedAPIError as e:
-                status_data['last_error'] = str(e)
-                if "403" in str(e) or "blocking" in str(e).lower():
-                    status_data['suggested_action'] = 'Vinted is blocking requests - manual token injection recommended'
-                elif "timeout" in str(e).lower():
-                    status_data['suggested_action'] = 'Network timeout - check internet connection or try again later'
-                else:
-                    status_data['suggested_action'] = 'Manual token injection recommended'
-            except Exception as e:
-                status_data['last_error'] = str(e)
-                status_data['suggested_action'] = 'Manual token injection recommended'
-        else:
-            status_data['suggested_action'] = 'No token available - manual injection required'
-            status_data['last_error'] = 'No access token found'
+        except VintedAPIError as e:
+            status_data['last_error'] = str(e)
+            if "403" in str(e) or "blocking" in str(e).lower():
+                status_data['suggested_action'] = '🔒 Temporary blocking detected - vinted_scraper will handle retry'
+            elif "timeout" in str(e).lower():
+                status_data['suggested_action'] = '🌐 Network timeout - check internet connection'
+            else:
+                status_data['suggested_action'] = '⚠️ API error - vinted_scraper will retry automatically'
+        except Exception as e:
+            status_data['last_error'] = str(e)
+            status_data['suggested_action'] = '🔧 Technical error - check logs'
         
         return JsonResponse(status_data)
         

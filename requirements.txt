@@ -4,3 +4,7 @@ django-background-tasks>=1.2.8
 playwright>=1.40.0
 requests>=2.31.0
 python-dotenv>=1.0.0
+pytz>=2023.3
+setuptools>=68.0.0
+wheel>=0.40.0
+httpx>=0.20.0

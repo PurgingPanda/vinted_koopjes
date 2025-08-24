@@ -6,7 +6,7 @@ from datetime import timedelta
 
 from .models import PriceWatch, VintedItem
 from .utils import fetch_and_process_items
-from .services import vinted_api
+from .services import VintedAPI
 from .activity_logger import ActivityLogger
 
 logger = logging.getLogger(__name__)

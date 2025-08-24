@@ -1,0 +1,19 @@
+# Production requirements for Vinted Koopjes
+Django>=5.0.0
+Pillow>=10.0.0
+django-background-tasks>=1.2.8
+requests>=2.31.0
+httpx>=0.20.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+playwright>=1.40.0
+python-decouple>=3.8
+
+# Production-specific packages
+gunicorn>=21.2.0
+psycopg2-binary>=2.9.7
+whitenoise>=6.6.0
+django-cors-headers>=4.3.0
+
+# Optional monitoring
+sentry-sdk[django]>=1.38.0

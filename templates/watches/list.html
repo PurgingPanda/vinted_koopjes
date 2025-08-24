@@ -7,8 +7,13 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <div>
+            {% if user.is_superuser %}
+            <h1 class="text-2xl font-bold text-gray-900">All Price Watches (Admin View)</h1>
+            <p class="mt-1 text-sm text-gray-600">Manage all users' price monitoring searches</p>
+            {% else %}
             <h1 class="text-2xl font-bold text-gray-900">My Price Watches</h1>
             <p class="mt-1 text-sm text-gray-600">Manage your price monitoring searches</p>
+            {% endif %}
         </div>
         <a href="{% url 'watch_create' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-secondary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -48,6 +53,14 @@
                                             </svg>
                                             {{ watch.alert_count }} alerts
                                         </div>
+                                        {% if user.is_superuser %}
+                                        <div class="flex items-center">
+                                            <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                            </svg>
+                                            Owner: {{ watch.user.username }}
+                                        </div>
+                                        {% endif %}
                                         <div class="flex items-center">
                                             <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0h6M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13M6 7h12"></path>

@@ -4,12 +4,13 @@
 A Django-based web application that monitors Vinted listings for underpriced items based on statistical analysis and user-defined price thresholds. Users create "price watches" with search parameters, and the system continuously monitors for deals.
 
 ## Tech Stack
-- **Backend**: Django with SQLite database
+- **Backend**: Django with PostgreSQL database (migrated from SQLite)
 - **Frontend**: Tailwind CSS
 - **API Integration**: Vinted API with Playwright for token management
 - **Background Tasks**: Django background tasks for continuous monitoring
 - **Notifications**: Email notifications for immediate alerts
 - **Testing**: Playwright MCP for frontend layout verification
+- **Database**: Remote PostgreSQL on spitsboog.org for production scalability
 
 ## Core Features
 
@@ -65,11 +66,29 @@ A Django-based web application that monitors Vinted listings for underpriced ite
 - **Hide Functionality**: One-click item hiding with smooth animations and persistent state
 - **Color Grading & Highlighting**: Consistent visual enhancement across all views
 
-### 8. Security & Configuration Enhancements
+### 8. Admin Features & Management (Latest)
+- **Superuser Access**: Admin users can view and manage all price watches from all users
+- **Cross-User Visibility**: Admin dashboard shows system-wide statistics, alerts, and items
+- **Owner Identification**: All watches display owner username in admin views
+- **Full Management Rights**: Admin can edit, delete, and control any user's price watches
+- **Admin Badge**: Visual indicator in navigation showing admin status
+- **Enhanced Dashboard**: Admin-specific welcome message and system-wide data overview
+- **Complete Oversight**: Access to all background tasks, alerts, and monitoring activities
+
+### 9. PostgreSQL Migration & Production Readiness (Latest)
+- **Database Migration**: Comprehensive migration from SQLite to PostgreSQL completed
+- **Remote Database**: Running on spitsboog.org PostgreSQL server for scalability
+- **Data Preservation**: All 2,830+ items, price watches, and alerts migrated successfully
+- **Connection Pooling**: Optimized PostgreSQL configuration with connection management
+- **Concurrent Access**: Resolved database lock issues with enterprise-grade database
+- **Backup Strategy**: Migration scripts created for future data management
+
+### 10. Security & Configuration Enhancements
 - **Environment Variables**: Secure `.env` file for EMAIL_HOST_PASSWORD and sensitive settings
 - **Automatic Cleanup**: Django signals automatically remove orphaned items when watches are deleted
 - **Database Optimization**: Comprehensive indexing for improved query performance
 - **Error Handling**: Robust error handling with detailed logging and graceful degradation
+- **User Authentication**: Secure admin account with custom password management
 
 ## Data Models
 
