@@ -32,6 +32,7 @@ DEBUG = True
 ALLOWED_HOSTS = ['100.118.148.48', '*.ts.net', 'spitsboog']
 
 
+
 # Application definition
 
 INSTALLED_APPS = [

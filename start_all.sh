@@ -47,8 +47,8 @@ cleanup() {
 # Set up signal handlers
 trap cleanup SIGINT SIGTERM
 
-echo -e "${GREEN}🌐 Starting Django development server...${NC}"
-python manage.py runserver --settings=settings_spitsboog &
+echo -e "${GREEN}🌐 Starting Django development server on port 8080...${NC}"
+python manage.py runserver 0.0.0.0:8080 --settings=settings_spitsboog &
 SERVER_PID=$!
 
 echo -e "${GREEN}⚙️  Starting background task processor...${NC}"
@@ -57,13 +57,13 @@ TASKS_PID=$!
 
 echo ""
 echo -e "${BLUE}📊 Services Status:${NC}"
-echo -e "  • Django Server: ${GREEN}Running${NC} (PID: $SERVER_PID) - http://127.0.0.1:8000"
+echo -e "  • Django Server: ${GREEN}Running${NC} (PID: $SERVER_PID) - http://0.0.0.0:8080"
 echo -e "  • Background Tasks: ${GREEN}Running${NC} (PID: $TASKS_PID)"
 echo ""
 echo -e "${YELLOW}📝 Useful URLs:${NC}"
-echo -e "  • Dashboard: http://127.0.0.1:8000"
-echo -e "  • Admin Panel: http://127.0.0.1:8000/admin/"
-echo -e "  • Token Injection: http://127.0.0.1:8000/token/inject/"
+echo -e "  • Dashboard: http://spitsboog.org:8080"
+echo -e "  • Admin Panel: http://spitsboog.org:8080/admin/"
+echo -e "  • Token Injection: http://spitsboog.org:8080/token/inject/"
 echo ""
 echo -e "${YELLOW}⚡ Press Ctrl+C to stop all services${NC}"
 echo ""

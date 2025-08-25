@@ -16,6 +16,11 @@ urlpatterns = [
     path('watches/<int:watch_id>/hide-item/<int:item_id>/', views.hide_underpriced_item, name='hide_underpriced_item'),
     path('api/parse-url/', views.parse_vinted_url, name='parse_vinted_url'),
     
+    # Clustering endpoints
+    path('watches/<int:pk>/analyze-clusters/', views.analyze_clusters, name='analyze_clusters'),
+    path('watches/<int:pk>/clusters/', views.ClusterOverviewView.as_view(), name='cluster_overview'),
+    path('clusters/<int:cluster_id>/', views.ClusterDetailView.as_view(), name='cluster_detail'),
+    
     # Token management
     path('token/inject/', views.token_injection_view, name='token_injection'),
     path('token/clear/', views.clear_token_view, name='clear_token'),

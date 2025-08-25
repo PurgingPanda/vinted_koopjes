@@ -14,10 +14,11 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 import json
 import logging
-from .models import PriceWatch, VintedItem, UnderpriceAlert, PriceStatistics
+from .models import PriceWatch, VintedItem, UnderpriceAlert, PriceStatistics, ClusterAnalysis, ItemCluster
 from .forms import PriceWatchForm
 from .utils import index_all_items, clear_and_reindex_items
 from .services import VintedAPI, VintedAPIError
+from .clustering.clustering_service import ClusteringService
 
 logger = logging.getLogger(__name__)
 
@@ -1146,3 +1147,148 @@ def api_status_view(request):
             'error': str(e),
             'suggested_action': 'Check logs for detailed error information'
         }, status=500)
+
+
+@login_required
+@require_POST
+def analyze_clusters(request, pk):
+    """Trigger clustering analysis for a price watch"""
+    try:
+        watch = get_object_or_404(PriceWatch, pk=pk)
+        
+        # Check user permission
+        if not request.user.is_superuser and watch.user != request.user:
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        
+        # Check if watch has enough items
+        item_count = watch.items.filter(is_active=True).count()
+        if item_count < 10:
+            return JsonResponse({
+                'success': False, 
+                'error': f'Insufficient items: {item_count} (minimum 10 required)'
+            })
+        
+        # Initialize clustering service and perform analysis
+        clustering_service = ClusteringService()
+        analysis = clustering_service.perform_clustering(
+            price_watch_id=pk,
+            eps=0.5,
+            min_samples=5
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'clusters': analysis.total_clusters,
+            'noise_items': analysis.noise_items,
+            'execution_time': analysis.execution_time,
+            'analysis_id': analysis.id
+        })
+        
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+    except Exception as e:
+        logger.error(f"Clustering analysis failed for watch {pk}: {e}")
+        return JsonResponse({'success': False, 'error': 'Clustering analysis failed'})
+
+
+class ClusterOverviewView(LoginRequiredMixin, DetailView):
+    """Show cluster overview for a price watch"""
+    model = PriceWatch
+    template_name = 'watches/clusters.html'
+    context_object_name = 'watch'
+    
+    def get_object(self):
+        obj = super().get_object()
+        # Check user permission
+        if not self.request.user.is_superuser and obj.user != self.request.user:
+            raise PermissionError("You don't have permission to view this watch")
+        return obj
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        watch = self.get_object()
+        
+        # Get the most recent analysis
+        analysis = ClusterAnalysis.objects.filter(
+            price_watch=watch,
+            status='completed'
+        ).order_by('-created_at').first()
+        
+        context['analysis'] = analysis
+        
+        if analysis:
+            # Get cluster summary using clustering service
+            clustering_service = ClusteringService()
+            cluster_summary = clustering_service.get_cluster_summary(analysis)
+            context['clusters'] = cluster_summary
+        else:
+            context['clusters'] = []
+        
+        return context
+
+
+class ClusterDetailView(LoginRequiredMixin, DetailView):
+    """Show items in a specific cluster"""
+    template_name = 'watches/cluster_detail.html'
+    context_object_name = 'watch'
+    
+    def get_object(self):
+        # Get watch from analysis or cluster parameter
+        analysis_id = self.request.GET.get('analysis')
+        cluster_id = self.kwargs['cluster_id']
+        
+        if analysis_id:
+            analysis = get_object_or_404(ClusterAnalysis, id=analysis_id)
+            watch = analysis.price_watch
+        else:
+            # Find most recent analysis with this cluster
+            cluster_item = get_object_or_404(
+                ItemCluster.objects.select_related('price_watch'),
+                cluster_id=cluster_id
+            )
+            watch = cluster_item.price_watch
+        
+        # Check user permission
+        if not self.request.user.is_superuser and watch.user != self.request.user:
+            raise PermissionError("You don't have permission to view this watch")
+        
+        return watch
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        watch = self.get_object()
+        cluster_id = self.kwargs['cluster_id']
+        analysis_id = self.request.GET.get('analysis')
+        
+        context['cluster_id'] = cluster_id
+        
+        # Get the analysis
+        if analysis_id:
+            analysis = get_object_or_404(ClusterAnalysis, id=analysis_id, price_watch=watch)
+        else:
+            analysis = ClusterAnalysis.objects.filter(
+                price_watch=watch,
+                status='completed'
+            ).order_by('-created_at').first()
+        
+        if not analysis:
+            context['items'] = ItemCluster.objects.none()
+            return context
+        
+        # Get items in this cluster
+        items = ItemCluster.objects.filter(
+            cluster_analysis=analysis,
+            cluster_id=cluster_id
+        ).select_related('item').order_by('item__price')
+        
+        context['items'] = items
+        
+        # Calculate cluster statistics (if not noise cluster)
+        if cluster_id != -1 and items:
+            prices = [item.item.price for item in items]
+            context['avg_price'] = sum(prices) / len(prices)
+            context['min_price'] = min(prices)
+            context['max_price'] = max(prices)
+            context['price_range'] = max(prices) - min(prices)
+        
+        return context

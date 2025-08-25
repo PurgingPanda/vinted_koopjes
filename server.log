@@ -1,60 +1,37 @@
 Watching for file changes with StatReloader
-[19/Aug/2025 22:20:02] "GET / HTTP/1.1" 200 60887
-Not Found: /favicon.ico
-[19/Aug/2025 22:20:08] "GET / HTTP/1.1" 200 60887
-[19/Aug/2025 22:20:40] "GET /watches/8/ HTTP/1.1" 200 162058
-[19/Aug/2025 22:22:27] "GET /watches/8/ HTTP/1.1" 200 168612
-[19/Aug/2025 22:22:57] "GET /watches/8/ HTTP/1.1" 200 168612
-[19/Aug/2025 22:23:02] "GET / HTTP/1.1" 200 62174
-/mnt/c/Users/fa990/Repos/vinted_koopjes/watches/views.py changed, reloading.
-Performing system checks...
-
-System check identified no issues (0 silenced).
-August 19, 2025 - 22:19:57
-Django version 5.2.5, using settings 'vinted_koopjes.settings'
-Starting development server at http://127.0.0.1:8000/
-Quit the server with CONTROL-C.
-
-WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
-For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
-Watching for file changes with StatReloader
-[19/Aug/2025 22:24:29] "GET / HTTP/1.1" 200 70200
-[19/Aug/2025 22:24:50] "GET / HTTP/1.1" 302 0
-[19/Aug/2025 22:24:50] "GET /accounts/login/?next=/ HTTP/1.1" 200 4351
-/mnt/c/Users/fa990/Repos/vinted_koopjes/watches/models.py changed, reloading.
-Performing system checks...
-
-System check identified no issues (0 silenced).
-August 19, 2025 - 22:23:57
-Django version 5.2.5, using settings 'vinted_koopjes.settings'
-Starting development server at http://127.0.0.1:8000/
-Quit the server with CONTROL-C.
-
-WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
-For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
-Watching for file changes with StatReloader
-[19/Aug/2025 22:25:45] "GET / HTTP/1.1" 200 71679
-/mnt/c/Users/fa990/Repos/vinted_koopjes/watches/models.py changed, reloading.
-Performing system checks...
-
-System check identified no issues (0 silenced).
-August 19, 2025 - 22:25:14
-Django version 5.2.5, using settings 'vinted_koopjes.settings'
-Starting development server at http://127.0.0.1:8000/
-Quit the server with CONTROL-C.
-
-WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
-For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
-Watching for file changes with StatReloader
-/mnt/c/Users/fa990/Repos/vinted_koopjes/watches/views.py changed, reloading.
-Performing system checks...
-
-System check identified no issues (0 silenced).
-August 19, 2025 - 22:26:09
-Django version 5.2.5, using settings 'vinted_koopjes.settings'
-Starting development server at http://127.0.0.1:8000/
-Quit the server with CONTROL-C.
-
-WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
-For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
-Watching for file changes with StatReloader
+(0.005) 
+            SELECT
+                c.relname,
+                CASE
+                    WHEN c.relispartition THEN 'p'
+                    WHEN c.relkind IN ('m', 'v') THEN 'v'
+                    ELSE 't'
+                END,
+                obj_description(c.oid, 'pg_class')
+            FROM pg_catalog.pg_class c
+            LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind IN ('f', 'm', 'p', 'r', 'v')
+                AND n.nspname NOT IN ('pg_catalog', 'pg_toast')
+                AND pg_catalog.pg_table_is_visible(c.oid)
+        ; args=None; alias=default
+(0.001) SELECT "django_migrations"."id", "django_migrations"."app", "django_migrations"."name", "django_migrations"."applied" FROM "django_migrations"; args=(); alias=default
+(0.002) SELECT "django_session"."session_key", "django_session"."session_data", "django_session"."expire_date" FROM "django_session" WHERE ("django_session"."expire_date" > '2025-08-25T19:40:53.339534+00:00'::timestamptz AND "django_session"."session_key" = '4usmewalvhzgly4z59igac3lv05c45v9') LIMIT 21; args=(datetime.datetime(2025, 8, 25, 19, 40, 53, 339534, tzinfo=datetime.timezone.utc), '4usmewalvhzgly4z59igac3lv05c45v9'); alias=default
+(0.001) SELECT "auth_user"."id", "auth_user"."password", "auth_user"."last_login", "auth_user"."is_superuser", "auth_user"."username", "auth_user"."first_name", "auth_user"."last_name", "auth_user"."email", "auth_user"."is_staff", "auth_user"."is_active", "auth_user"."date_joined" FROM "auth_user" WHERE "auth_user"."id" = 5 LIMIT 21; args=(5,); alias=default
+(0.001) SELECT "watches_pricewatch"."id", "watches_pricewatch"."name", "watches_pricewatch"."user_id", "watches_pricewatch"."search_parameters", "watches_pricewatch"."std_dev_threshold", "watches_pricewatch"."absolute_price_threshold", "watches_pricewatch"."blacklist_words", "watches_pricewatch"."highlight_words", "watches_pricewatch"."is_active", "watches_pricewatch"."created_at", "watches_pricewatch"."updated_at" FROM "watches_pricewatch" WHERE "watches_pricewatch"."id" = 1 LIMIT 21; args=(1,); alias=default
+(0.001) SELECT COUNT(*) AS "__count" FROM "watches_pricewatch_items" WHERE "watches_pricewatch_items"."pricewatch_id" = 1; args=(1,); alias=default
+❌ Search failed: Navigation failed: HTTP 403: 
+❌ RuntimeError in search: Navigation failed: HTTP 403: 
+❌ Non-retryable error in _search_async: Navigation failed: HTTP 403: 
+(0.001) SELECT "django_session"."session_key", "django_session"."session_data", "django_session"."expire_date" FROM "django_session" WHERE ("django_session"."expire_date" > '2025-08-25T19:41:01.286196+00:00'::timestamptz AND "django_session"."session_key" = '4usmewalvhzgly4z59igac3lv05c45v9') LIMIT 21; args=(datetime.datetime(2025, 8, 25, 19, 41, 1, 286196, tzinfo=datetime.timezone.utc), '4usmewalvhzgly4z59igac3lv05c45v9'); alias=default
+(0.001) SELECT "auth_user"."id", "auth_user"."password", "auth_user"."last_login", "auth_user"."is_superuser", "auth_user"."username", "auth_user"."first_name", "auth_user"."last_name", "auth_user"."email", "auth_user"."is_staff", "auth_user"."is_active", "auth_user"."date_joined" FROM "auth_user" WHERE "auth_user"."id" = 5 LIMIT 21; args=(5,); alias=default
+(0.001) SELECT "watches_pricewatch"."id", "watches_pricewatch"."name", "watches_pricewatch"."user_id", "watches_pricewatch"."search_parameters", "watches_pricewatch"."std_dev_threshold", "watches_pricewatch"."absolute_price_threshold", "watches_pricewatch"."blacklist_words", "watches_pricewatch"."highlight_words", "watches_pricewatch"."is_active", "watches_pricewatch"."created_at", "watches_pricewatch"."updated_at" FROM "watches_pricewatch" WHERE "watches_pricewatch"."id" = 1 LIMIT 21; args=(1,); alias=default
+(0.001) SELECT "watches_pricestatistics"."id", "watches_pricestatistics"."price_watch_id", "watches_pricestatistics"."condition", "watches_pricestatistics"."mean_price", "watches_pricestatistics"."std_deviation", "watches_pricestatistics"."item_count", "watches_pricestatistics"."last_calculated" FROM "watches_pricestatistics" WHERE "watches_pricestatistics"."price_watch_id" = 1; args=(1,); alias=default
+(0.001) SELECT COUNT(*) AS "__count" FROM "watches_pricewatch_items" WHERE "watches_pricewatch_items"."pricewatch_id" = 1; args=(1,); alias=default
+(0.000) SELECT "watches_pricestatistics"."id", "watches_pricestatistics"."price_watch_id", "watches_pricestatistics"."condition", "watches_pricestatistics"."mean_price", "watches_pricestatistics"."std_deviation", "watches_pricestatistics"."item_count", "watches_pricestatistics"."last_calculated" FROM "watches_pricestatistics" WHERE "watches_pricestatistics"."price_watch_id" = 1; args=(1,); alias=default
+(0.000) SELECT "watches_pricestatistics"."id", "watches_pricestatistics"."price_watch_id", "watches_pricestatistics"."condition", "watches_pricestatistics"."mean_price", "watches_pricestatistics"."std_deviation", "watches_pricestatistics"."item_count", "watches_pricestatistics"."last_calculated" FROM "watches_pricestatistics" WHERE "watches_pricestatistics"."price_watch_id" = 1; args=(1,); alias=default
+(0.001) SELECT "watches_pricestatistics"."id", "watches_pricestatistics"."price_watch_id", "watches_pricestatistics"."condition", "watches_pricestatistics"."mean_price", "watches_pricestatistics"."std_deviation", "watches_pricestatistics"."item_count", "watches_pricestatistics"."last_calculated" FROM "watches_pricestatistics" WHERE "watches_pricestatistics"."price_watch_id" = 1; args=(1,); alias=default
+(0.002) SELECT "watches_underpricealert"."id", "watches_underpricealert"."price_watch_id", "watches_underpricealert"."item_id", "watches_underpricealert"."detected_at", "watches_underpricealert"."price_difference", "watches_underpricealert"."std_deviations_below", "watches_underpricealert"."email_sent", "watches_underpricealert"."email_sent_at", "watches_underpricealert"."hidden", "watches_vinteditem"."id", "watches_vinteditem"."vinted_id", "watches_vinteditem"."price", "watches_vinteditem"."condition", "watches_vinteditem"."title", "watches_vinteditem"."brand", "watches_vinteditem"."size", "watches_vinteditem"."color", "watches_vinteditem"."description", "watches_vinteditem"."upload_date", "watches_vinteditem"."seller_id", "watches_vinteditem"."seller_login", "watches_vinteditem"."seller_business", "watches_vinteditem"."favourite_count", "watches_vinteditem"."view_count", "watches_vinteditem"."service_fee", "watches_vinteditem"."total_item_price", "watches_vinteditem"."api_response", "watches_vinteditem"."first_seen", "watches_vinteditem"."last_seen", "watches_vinteditem"."is_active" FROM "watches_underpricealert" INNER JOIN "watches_vinteditem" ON ("watches_underpricealert"."item_id" = "watches_vinteditem"."id") WHERE "watches_underpricealert"."price_watch_id" = 1 ORDER BY "watches_underpricealert"."detected_at" DESC LIMIT 10; args=(1,); alias=default
+[25/Aug/2025 19:41:01] "GET /watches/1/ HTTP/1.1" 200 34458
+🚀 Using PostgreSQL database on spitsboog.org
+Database: vinted_koopjes@spitsboog.org:5432
+User: vinted

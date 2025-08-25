@@ -446,6 +446,10 @@ def fetch_and_process_items(price_watch: PriceWatch, max_pages: int = 5) -> int:
                 
                 # Fetch items from Vinted API
                 vinted_api = VintedAPI()
+                # Debug: Show which scraper implementation is being used
+                import os
+                scraper_mode = os.getenv('VINTED_SCRAPER_MODE', 'unknown')
+                logger.info(f"🔧 UTILS DEBUG: Environment VINTED_SCRAPER_MODE={scraper_mode}")
                 items_data = vinted_api.search_items(search_params)
                 
                 if not items_data:

@@ -10,6 +10,9 @@ if vinted_scraper_path not in sys.path:
 
 try:
     from vinted_scraper import VintedScraper
+    # Log which scraper implementation is being used
+    scraper_mode = os.getenv('VINTED_SCRAPER_MODE', 'unknown')
+    logging.info(f"🔧 DJANGO SERVICE: Using scraper mode={scraper_mode}, implementation={VintedScraper.__name__ if VintedScraper else 'None'}")
 except ImportError as e:
     logging.error(f"Failed to import VintedScraper: {e}")
     VintedScraper = None
@@ -46,7 +49,8 @@ class VintedAPI:
                 
                 # Use default configuration - let vinted_scraper handle everything
                 self._scraper = VintedScraper(self.BASE_URL)
-                logger.info("✅ VintedScraper instance created")
+                logger.info(f"✅ VintedScraper instance created: {self._scraper.__class__.__name__}")
+                logger.info(f"🔧 ACTIVE SCRAPER: {self._scraper.__class__.__module__}.{self._scraper.__class__.__name__}")
             except Exception as e:
                 error_msg = str(e).lower()
                 if "403" in error_msg or "blocking" in error_msg:
@@ -103,6 +107,9 @@ class VintedAPI:
         """
         Search for items using the working scraper
         """
+        from .models import BlockingState
+        blocking_state = BlockingState.get_current_state()
+        
         try:
             logger.info(f"Searching items with params: {search_params}")
             scraper = self._get_scraper()
@@ -177,6 +184,11 @@ class VintedAPI:
                     logger.warning(f"Error converting item to dict: {e}")
                     continue
             
+            # Success - mark as unblocked if it was blocked
+            if blocking_state.is_blocked:
+                logger.info("✅ API recovered from blocking state")
+                blocking_state.mark_unblocked()
+            
             logger.info(f"✅ Found {len(items)} items using working scraper")
             return items
             
@@ -184,6 +196,8 @@ class VintedAPI:
             error_msg = str(e).lower()
             if "403" in error_msg or "blocking" in error_msg:
                 logger.warning(f"🔒 Temporary blocking detected during search: {e}")
+                # Mark API as blocked
+                blocking_state.mark_blocked()
                 # Reset scraper to force re-initialization on next call
                 self._scraper = None
                 raise VintedAPIError(f"Temporary blocking (403) - scraper will retry: {e}")

@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import PriceWatch, VintedItem, PriceStatistics, UnderpriceAlert, ScrapeActivity
+from .models import (
+    PriceWatch, VintedItem, PriceStatistics, UnderpriceAlert, ScrapeActivity,
+    ClusterAnalysis, ItemCluster, ItemEmbedding
+)
 
 
 @admin.register(PriceWatch)
@@ -99,6 +102,85 @@ class ScrapeActivityAdmin(admin.ModelAdmin):
         }),
         ('Error Details', {
             'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(ClusterAnalysis)
+class ClusterAnalysisAdmin(admin.ModelAdmin):
+    list_display = ['price_watch', 'total_items', 'total_clusters', 'noise_items', 'status', 'execution_time', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['price_watch__name']
+    readonly_fields = ['created_at', 'execution_time']
+    ordering = ['-created_at']
+    
+    fieldsets = (
+        ('Analysis Details', {
+            'fields': ('price_watch', 'status', 'execution_time')
+        }),
+        ('Results', {
+            'fields': ('total_items', 'total_clusters', 'noise_items')
+        }),
+        ('Parameters', {
+            'fields': ('eps_parameter', 'min_samples')
+        }),
+        ('Error Information', {
+            'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamp', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(ItemCluster)
+class ItemClusterAdmin(admin.ModelAdmin):
+    list_display = ['item', 'cluster_id', 'cluster_analysis', 'distance_to_centroid', 'is_representative']
+    list_filter = ['cluster_id', 'is_representative', 'cluster_analysis']
+    search_fields = ['item__title', 'item__vinted_id']
+    readonly_fields = ['created_at']
+    list_per_page = 50
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('item', 'cluster_analysis')
+    
+    fieldsets = (
+        ('Cluster Assignment', {
+            'fields': ('cluster_analysis', 'cluster_id', 'item')
+        }),
+        ('Cluster Position', {
+            'fields': ('distance_to_centroid', 'is_representative')
+        }),
+        ('Timestamp', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(ItemEmbedding)
+class ItemEmbeddingAdmin(admin.ModelAdmin):
+    list_display = ['item', 'embedding_version', 'created_at']
+    list_filter = ['embedding_version', 'created_at']
+    search_fields = ['item__title', 'item__vinted_id']
+    readonly_fields = ['created_at']
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('item')
+    
+    fieldsets = (
+        ('Item Information', {
+            'fields': ('item', 'embedding_version')
+        }),
+        ('Embeddings', {
+            'fields': ('title_embedding', 'description_embedding', 'image_embedding'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamp', {
+            'fields': ('created_at',),
             'classes': ('collapse',)
         }),
     )
