@@ -1,0 +1,1 @@
+The current system uses scraper code in "vinted_scraper" directory. This scraper gets blocked easily. I want you to make a drop in replacement for it (the interface is the same) that uses the playwright framework to make requests instead. Make a Plan. Ask about uncer

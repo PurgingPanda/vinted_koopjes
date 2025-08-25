@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.utils import timezone
 
 
 class PriceWatch(models.Model):
@@ -211,5 +212,127 @@ class ScrapeActivity(models.Model):
         if self.completed_at and self.started_at:
             self.duration_seconds = (self.completed_at - self.started_at).total_seconds()
         super().save(*args, **kwargs)
+
+
+class ItemEmbedding(models.Model):
+    """Store embeddings for items for clustering analysis"""
+    item = models.OneToOneField(VintedItem, on_delete=models.CASCADE)
+    title_embedding = models.JSONField(help_text="Title text embedding as list")
+    description_embedding = models.JSONField(help_text="Description text embedding as list")
+    image_embedding = models.JSONField(help_text="Image embedding as list")
+    embedding_version = models.CharField(max_length=50, help_text="Track model versions")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Embeddings for {self.item}"
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['created_at']),
+            models.Index(fields=['embedding_version']),
+        ]
+
+
+class ClusterAnalysis(models.Model):
+    """Track clustering analysis runs"""
+    STATUS_CHOICES = [
+        ('running', 'Running'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed')
+    ]
+    
+    price_watch = models.ForeignKey(PriceWatch, on_delete=models.CASCADE)
+    total_items = models.IntegerField(help_text="Total items analyzed")
+    total_clusters = models.IntegerField(help_text="Number of clusters found")
+    noise_items = models.IntegerField(help_text="Items that didn't cluster")
+    eps_parameter = models.FloatField(default=0.5, help_text="DBSCAN eps parameter")
+    min_samples = models.IntegerField(default=5, help_text="DBSCAN min_samples parameter")
+    execution_time = models.FloatField(help_text="Execution time in seconds")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='running')
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Cluster analysis for {self.price_watch.name} - {self.total_clusters} clusters"
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['price_watch', '-created_at']),
+            models.Index(fields=['status', '-created_at']),
+        ]
+        verbose_name = "Cluster Analysis"
+        verbose_name_plural = "Cluster Analyses"
+
+
+class ItemCluster(models.Model):
+    """Assign items to clusters"""
+    price_watch = models.ForeignKey(PriceWatch, on_delete=models.CASCADE)
+    cluster_analysis = models.ForeignKey(ClusterAnalysis, on_delete=models.CASCADE)
+    item = models.ForeignKey(VintedItem, on_delete=models.CASCADE)
+    cluster_id = models.IntegerField(help_text="Cluster ID (-1 for noise/outliers)")
+    distance_to_centroid = models.FloatField(help_text="Distance from cluster centroid")
+    is_representative = models.BooleanField(default=False, help_text="Is this item representative of the cluster")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.item} in cluster {self.cluster_id}"
+    
+    class Meta:
+        unique_together = ['cluster_analysis', 'item']
+        indexes = [
+            models.Index(fields=['price_watch', 'cluster_id']),
+            models.Index(fields=['cluster_analysis', 'cluster_id']),
+            models.Index(fields=['cluster_id', 'is_representative']),
+            models.Index(fields=['distance_to_centroid']),
+        ]
+
+
+class BlockingState(models.Model):
+    """Track Vinted API blocking status for smart monitoring"""
+    is_blocked = models.BooleanField(default=False, help_text="Is the API currently blocked?")
+    blocked_since = models.DateTimeField(null=True, blank=True, help_text="When blocking started")
+    last_blocked_check = models.DateTimeField(auto_now=True, help_text="Last time we checked blocking status")
+    last_successful_request = models.DateTimeField(null=True, blank=True, help_text="Last successful API call")
+    consecutive_failures = models.IntegerField(default=0, help_text="Number of consecutive API failures")
+    test_watch_id = models.IntegerField(null=True, blank=True, help_text="ID of watch to use for testing during blocked state")
+    
+    def __str__(self):
+        status = "BLOCKED" if self.is_blocked else "OK"
+        return f"API Status: {status}"
+    
+    @classmethod
+    def get_current_state(cls):
+        """Get or create the singleton blocking state record"""
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+    
+    def mark_blocked(self):
+        """Mark API as blocked"""
+        if not self.is_blocked:
+            self.blocked_since = timezone.now()
+        self.is_blocked = True
+        self.consecutive_failures += 1
+        self.save()
+    
+    def mark_unblocked(self):
+        """Mark API as unblocked"""
+        self.is_blocked = False
+        self.blocked_since = None
+        self.last_successful_request = timezone.now()
+        self.consecutive_failures = 0
+        self.save()
+    
+    def should_use_blocked_schedule(self):
+        """Determine if we should use 30-minute intervals (when blocked) vs normal 5-minute intervals"""
+        return self.is_blocked
+    
+    def get_blocked_check_interval(self):
+        """Get check interval in seconds: 30 minutes when blocked, 5 minutes when active"""
+        return 1800 if self.is_blocked else 300  # 30 minutes vs 5 minutes
+    
+    class Meta:
+        verbose_name = "API Blocking State"
+        verbose_name_plural = "API Blocking States"
 
 
