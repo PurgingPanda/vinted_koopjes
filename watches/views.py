@@ -31,10 +31,12 @@ class PriceWatchListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         if self.request.user.is_superuser:
             return PriceWatch.objects.all().annotate(
-                alert_count=Count('underpricealert')
+                alert_count=Count('underpricealert'),
+                item_count=Count('items')
             )
         return PriceWatch.objects.filter(user=self.request.user).annotate(
-            alert_count=Count('underpricealert')
+            alert_count=Count('underpricealert'),
+            item_count=Count('items')
         )
 
 

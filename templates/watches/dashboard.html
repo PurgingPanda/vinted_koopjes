@@ -550,7 +550,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     {% endif %}
     
-    // API Status Checking
+    // API Status Checking with adaptive intervals
+    let apiCheckInterval = null;
+    let isBlocked = false;
+    
     function checkApiStatus() {
         fetch('{% url "api_status" %}')
             .then(response => response.json())
@@ -561,9 +564,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Only show warnings if API is not working (vinted_scraper handles tokens automatically)
                 if (!data.api_working) {
                     let statusMessage = '';
+                    let is403Block = false;
                     
                     if (data.last_error && data.last_error.includes('403')) {
                         statusMessage = '🔒 Temporary blocking detected - vinted_scraper will handle retry automatically.';
+                        is403Block = true;
                     } else if (data.last_error && data.last_error.includes('timeout')) {
                         statusMessage = '⏱️ Network timeout. Check your internet connection.';
                     } else if (data.last_error) {
@@ -574,8 +579,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     message.textContent = statusMessage + ' ' + data.suggested_action;
                     alert.classList.remove('hidden');
+                    
+                    // Update blocking state and adjust check interval
+                    if (is403Block && !isBlocked) {
+                        isBlocked = true;
+                        setApiCheckInterval(15 * 60 * 1000); // 15 minutes when blocked
+                        console.log('API blocked - reduced check frequency to 15 minutes');
+                    }
                 } else {
                     alert.classList.add('hidden');
+                    
+                    // If we were blocked but now working, reset to normal interval
+                    if (isBlocked) {
+                        isBlocked = false;
+                        setApiCheckInterval(2 * 60 * 1000); // 2 minutes when working
+                        console.log('API working again - restored normal check frequency');
+                    }
                 }
             })
             .catch(error => {
@@ -587,6 +606,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
+    function setApiCheckInterval(intervalMs) {
+        if (apiCheckInterval) {
+            clearInterval(apiCheckInterval);
+        }
+        apiCheckInterval = setInterval(checkApiStatus, intervalMs);
+    }
+    
     function dismissAlert() {
         document.getElementById('api-status-alert').classList.add('hidden');
     }
@@ -594,8 +620,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check API status on page load
     checkApiStatus();
     
-    // Auto-refresh API status every 2 minutes
-    setInterval(checkApiStatus, 120000);
+    // Start with normal 2-minute intervals
+    setApiCheckInterval(2 * 60 * 1000);
 });
 </script>
 {% endblock %}
